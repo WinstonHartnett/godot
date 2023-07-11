@@ -139,7 +139,7 @@
 			<description>
 				Adds a child [param node]. Nodes can have any number of children, but every child must have a unique name. Child nodes are automatically deleted when the parent node is deleted, so an entire scene can be removed by deleting its topmost node.
 				If [param force_readable_name] is [code]true[/code], improves the readability of the added [param node]. If not named, the [param node] is renamed to its type, and if it shares [member name] with a sibling, a number is suffixed more appropriately. This operation is very slow. As such, it is recommended leaving this to [code]false[/code], which assigns a dummy name featuring [code]@[/code] in both situations.
-				If [param internal] is different than [constant INTERNAL_MODE_DISABLED], the child will be added as internal node. Such nodes are ignored by methods like [method get_children], unless their parameter [code]include_internal[/code] is [code]true[/code]. The intended usage is to hide the internal nodes from the user, so the user won't accidentally delete or modify them. Used by some GUI nodes, e.g. [ColorPicker]. See [enum InternalMode] for available modes.
+				If [param internal] is different than [constant INTERNAL_MODE_DISABLED], the child will be added as internal node. See [member internal_mode].
 				[b]Note:[/b] If the child node already has a parent, the function will fail. Use [method remove_child] first to remove the node from its current parent. For example:
 				[codeblocks]
 				[gdscript]
@@ -860,6 +860,9 @@
 		<member name="owner" type="Node" setter="set_owner" getter="get_owner">
 			The node owner. A node can have any ancestor node as owner (i.e. a parent, grandparent, etc. node ascending in the tree). This implies that [method add_child] should be called before setting the owner, so that this relationship of parenting exists. When saving a node (using [PackedScene]), all the nodes it owns will be saved with it. This allows for the creation of complex scene trees, with instancing and subinstancing.
 			[b]Note:[/b] If you want a child to be persisted to a [PackedScene], you must set [member owner] in addition to calling [method add_child]. This is typically relevant for [url=$DOCS_URL/tutorials/plugins/running_code_in_the_editor.html]tool scripts[/url] and [url=$DOCS_URL/tutorials/plugins/editor/index.html]editor plugins[/url]. If a new node is added to the tree without setting its owner as an ancestor in that tree, it will be visible in the 2D/3D view, but not in the scene tree (and not persisted when packing or saving).
+		</member>
+		<member name="internal_mode" type="int" setter="" getter="get_internal_mode">
+			The internal mode of the Node. Internal nodes are ignored by methods like [method get_children], unless their parameter [code]include_internal[/code] is [code]true[/code]. The intended usage is to hide the internal nodes from the user, so the user won't accidentally delete or modify them. Used by some GUI nodes, e.g. [ColorPicker]. See [enum InternalMode] for available modes.
 		</member>
 		<member name="process_mode" type="int" setter="set_process_mode" getter="get_process_mode" enum="Node.ProcessMode" default="0">
 			Can be used to pause or unpause the node, or make the node paused based on the [SceneTree], or make it inherit the process mode from its parent (default).

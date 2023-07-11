@@ -529,6 +529,10 @@ bool Node::is_physics_processing_internal() const {
 	return data.physics_process_internal;
 }
 
+Node::InternalMode Node::get_internal_mode() const {
+	return data.internal_mode;
+}
+
 void Node::set_process_mode(ProcessMode p_mode) {
 	ERR_THREAD_GUARD
 	if (data.process_mode == p_mode) {
@@ -3285,6 +3289,7 @@ void Node::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("is_processing_unhandled_input"), &Node::is_processing_unhandled_input);
 	ClassDB::bind_method(D_METHOD("set_process_unhandled_key_input", "enable"), &Node::set_process_unhandled_key_input);
 	ClassDB::bind_method(D_METHOD("is_processing_unhandled_key_input"), &Node::is_processing_unhandled_key_input);
+	ClassDB::bind_method(D_METHOD("get_internal_mode"), &Node::get_internal_mode);
 	ClassDB::bind_method(D_METHOD("set_process_mode", "mode"), &Node::set_process_mode);
 	ClassDB::bind_method(D_METHOD("get_process_mode"), &Node::get_process_mode);
 	ClassDB::bind_method(D_METHOD("can_process"), &Node::can_process);
@@ -3471,6 +3476,7 @@ void Node::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "scene_file_path", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NONE), "set_scene_file_path", "get_scene_file_path");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "owner", PROPERTY_HINT_RESOURCE_TYPE, "Node", PROPERTY_USAGE_NONE), "set_owner", "get_owner");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "multiplayer", PROPERTY_HINT_RESOURCE_TYPE, "MultiplayerAPI", PROPERTY_USAGE_NONE), "", "get_multiplayer");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "internal_mode", PROPERTY_HINT_ENUM, "Disabled,Front,Back"), "", "get_internal_mode");
 
 	ADD_GROUP("Process", "process_");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "process_mode", PROPERTY_HINT_ENUM, "Inherit,Pausable,When Paused,Always,Disabled"), "set_process_mode", "get_process_mode");

@@ -593,6 +593,7 @@ public:
 
 	void replace_by(Node *p_node, bool p_keep_data = false);
 
+	InternalMode get_internal_mode() const;
 	void set_process_mode(ProcessMode p_mode);
 	ProcessMode get_process_mode() const;
 	bool can_process() const;
