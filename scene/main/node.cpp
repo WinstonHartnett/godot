@@ -3476,7 +3476,7 @@ void Node::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "scene_file_path", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NONE), "set_scene_file_path", "get_scene_file_path");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "owner", PROPERTY_HINT_RESOURCE_TYPE, "Node", PROPERTY_USAGE_NONE), "set_owner", "get_owner");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "multiplayer", PROPERTY_HINT_RESOURCE_TYPE, "MultiplayerAPI", PROPERTY_USAGE_NONE), "", "get_multiplayer");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "internal_mode", PROPERTY_HINT_ENUM, "Disabled,Front,Back"), "", "get_internal_mode");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "internal_mode", PROPERTY_HINT_ENUM, "Disabled,Front,Back", PROPERTY_USAGE_NONE), "", "get_internal_mode");
 
 	ADD_GROUP("Process", "process_");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "process_mode", PROPERTY_HINT_ENUM, "Inherit,Pausable,When Paused,Always,Disabled"), "set_process_mode", "get_process_mode");
