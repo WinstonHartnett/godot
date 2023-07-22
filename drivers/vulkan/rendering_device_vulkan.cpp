@@ -54,9 +54,13 @@ RenderingDeviceVulkan::Buffer *RenderingDeviceVulkan::_get_buffer_from_owner(RID
 		r_stage_mask |= VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
 		r_access_mask |= VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
 		if (buffer->usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) {
-			if (p_post_barrier.has_flag(BARRIER_MASK_RASTER)) {
+			if (p_post_barrier.has_flag(BARRIER_MASK_VERTEX)) {
 				r_access_mask |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
-				r_stage_mask |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+				r_stage_mask |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
+			}
+			if (p_post_barrier.has_flag(BARRIER_MASK_FRAGMENT)) {
+				r_access_mask |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+				r_stage_mask |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 			}
 			if (p_post_barrier.has_flag(BARRIER_MASK_COMPUTE)) {
 				r_access_mask |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
@@ -68,8 +72,11 @@ RenderingDeviceVulkan::Buffer *RenderingDeviceVulkan::_get_buffer_from_owner(RID
 		r_access_mask |= VK_ACCESS_INDEX_READ_BIT;
 		buffer = index_buffer_owner.get_or_null(p_buffer);
 	} else if (uniform_buffer_owner.owns(p_buffer)) {
-		if (p_post_barrier.has_flag(BARRIER_MASK_RASTER)) {
-			r_stage_mask |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		if (p_post_barrier.has_flag(BARRIER_MASK_VERTEX)) {
+			r_stage_mask |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
+		}
+		if (p_post_barrier.has_flag(BARRIER_MASK_FRAGMENT)) {
+			r_stage_mask |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 		}
 		if (p_post_barrier.has_flag(BARRIER_MASK_COMPUTE)) {
 			r_stage_mask |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
@@ -77,8 +84,12 @@ RenderingDeviceVulkan::Buffer *RenderingDeviceVulkan::_get_buffer_from_owner(RID
 		r_access_mask |= VK_ACCESS_UNIFORM_READ_BIT;
 		buffer = uniform_buffer_owner.get_or_null(p_buffer);
 	} else if (texture_buffer_owner.owns(p_buffer)) {
-		if (p_post_barrier.has_flag(BARRIER_MASK_RASTER)) {
-			r_stage_mask |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		if (p_post_barrier.has_flag(BARRIER_MASK_VERTEX)) {
+			r_stage_mask |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
+			r_access_mask |= VK_ACCESS_SHADER_READ_BIT;
+		}
+		if (p_post_barrier.has_flag(BARRIER_MASK_FRAGMENT)) {
+			r_stage_mask |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 			r_access_mask |= VK_ACCESS_SHADER_READ_BIT;
 		}
 		if (p_post_barrier.has_flag(BARRIER_MASK_COMPUTE)) {
@@ -89,8 +100,12 @@ RenderingDeviceVulkan::Buffer *RenderingDeviceVulkan::_get_buffer_from_owner(RID
 		buffer = &texture_buffer_owner.get_or_null(p_buffer)->buffer;
 	} else if (storage_buffer_owner.owns(p_buffer)) {
 		buffer = storage_buffer_owner.get_or_null(p_buffer);
-		if (p_post_barrier.has_flag(BARRIER_MASK_RASTER)) {
-			r_stage_mask |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		if (p_post_barrier.has_flag(BARRIER_MASK_VERTEX)) {
+			r_stage_mask |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
+			r_access_mask |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+		}
+		if (p_post_barrier.has_flag(BARRIER_MASK_FRAGMENT)) {
+			r_stage_mask |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 			r_access_mask |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
 		}
 		if (p_post_barrier.has_flag(BARRIER_MASK_COMPUTE)) {
@@ -2625,8 +2640,12 @@ Error RenderingDeviceVulkan::_texture_update(RID p_texture, uint32_t p_layer, co
 			barrier_flags |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 			access_flags |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
 		}
-		if (p_post_barrier.has_flag(BARRIER_MASK_RASTER)) {
-			barrier_flags |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		if (p_post_barrier.has_flag(BARRIER_MASK_VERTEX)) {
+			barrier_flags |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
+			access_flags |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+		}
+		if (p_post_barrier.has_flag(BARRIER_MASK_FRAGMENT)) {
+			barrier_flags |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 			access_flags |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
 		}
 		if (p_post_barrier.has_flag(BARRIER_MASK_TRANSFER)) {
@@ -3020,8 +3039,12 @@ Error RenderingDeviceVulkan::texture_copy(RID p_from_texture, RID p_to_texture, 
 			barrier_flags |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 			access_flags |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
 		}
-		if (p_post_barrier.has_flag(BARRIER_MASK_RASTER)) {
-			barrier_flags |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		if (p_post_barrier.has_flag(BARRIER_MASK_VERTEX)) {
+			barrier_flags |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
+			access_flags |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+		}
+		if (p_post_barrier.has_flag(BARRIER_MASK_FRAGMENT)) {
+			barrier_flags |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 			access_flags |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
 		}
 		if (p_post_barrier.has_flag(BARRIER_MASK_TRANSFER)) {
@@ -3198,8 +3221,12 @@ Error RenderingDeviceVulkan::texture_resolve_multisample(RID p_from_texture, RID
 			barrier_flags |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 			access_flags |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
 		}
-		if (p_post_barrier.has_flag(BARRIER_MASK_RASTER)) {
-			barrier_flags |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		if (p_post_barrier.has_flag(BARRIER_MASK_VERTEX)) {
+			barrier_flags |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
+			access_flags |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+		}
+		if (p_post_barrier.has_flag(BARRIER_MASK_FRAGMENT)) {
+			barrier_flags |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 			access_flags |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
 		}
 		if (p_post_barrier.has_flag(BARRIER_MASK_TRANSFER)) {
@@ -3334,8 +3361,12 @@ Error RenderingDeviceVulkan::texture_clear(RID p_texture, const Color &p_color, 
 			barrier_flags |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 			access_flags |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
 		}
-		if (p_post_barrier.has_flag(BARRIER_MASK_RASTER)) {
-			barrier_flags |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		if (p_post_barrier.has_flag(BARRIER_MASK_VERTEX)) {
+			barrier_flags |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
+			access_flags |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+		}
+		if (p_post_barrier.has_flag(BARRIER_MASK_FRAGMENT)) {
+			barrier_flags |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 			access_flags |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
 		}
 		if (p_post_barrier.has_flag(BARRIER_MASK_TRANSFER)) {
@@ -7651,9 +7682,13 @@ void RenderingDeviceVulkan::draw_list_end(BitField<BarrierMask> p_post_barrier) 
 		barrier_flags |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 		access_flags |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
 	}
-	if (p_post_barrier.has_flag(BARRIER_MASK_RASTER)) {
-		barrier_flags |= VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT /*| VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT*/;
+	if (p_post_barrier.has_flag(BARRIER_MASK_VERTEX)) {
+		barrier_flags |= VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT /*| VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT*/;
 		access_flags |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT /*| VK_ACCESS_INDIRECT_COMMAND_READ_BIT*/;
+	}
+	if (p_post_barrier.has_flag(BARRIER_MASK_FRAGMENT)) {
+		barrier_flags |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT /*| VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT*/;
+		access_flags |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT /*| VK_ACCESS_INDIRECT_COMMAND_READ_BIT*/;
 	}
 	if (p_post_barrier.has_flag(BARRIER_MASK_TRANSFER)) {
 		barrier_flags |= VK_PIPELINE_STAGE_TRANSFER_BIT;
@@ -7745,6 +7780,8 @@ RenderingDevice::ComputeListID RenderingDeviceVulkan::compute_list_begin(bool p_
 }
 
 void RenderingDeviceVulkan::compute_list_bind_compute_pipeline(ComputeListID p_list, RID p_compute_pipeline) {
+	// Must be called within a compute list, the class mutex is locked during that time
+
 	ERR_FAIL_COND(p_list != ID_TYPE_COMPUTE_LIST);
 	ERR_FAIL_COND(!compute_list);
 
@@ -7809,6 +7846,8 @@ void RenderingDeviceVulkan::compute_list_bind_compute_pipeline(ComputeListID p_l
 }
 
 void RenderingDeviceVulkan::compute_list_bind_uniform_set(ComputeListID p_list, RID p_uniform_set, uint32_t p_index) {
+	// Must be called within a compute list, the class mutex is locked during that time
+
 	ERR_FAIL_COND(p_list != ID_TYPE_COMPUTE_LIST);
 	ERR_FAIL_COND(!compute_list);
 
@@ -7983,6 +8022,8 @@ void RenderingDeviceVulkan::compute_list_set_push_constant(ComputeListID p_list,
 }
 
 void RenderingDeviceVulkan::compute_list_dispatch(ComputeListID p_list, uint32_t p_x_groups, uint32_t p_y_groups, uint32_t p_z_groups) {
+	// Must be called within a compute list, the class mutex is locked during that time
+
 	ERR_FAIL_COND(p_list != ID_TYPE_COMPUTE_LIST);
 	ERR_FAIL_COND(!compute_list);
 
@@ -8126,6 +8167,8 @@ void RenderingDeviceVulkan::compute_list_dispatch_indirect(ComputeListID p_list,
 }
 
 void RenderingDeviceVulkan::compute_list_add_barrier(ComputeListID p_list) {
+	// Must be called within a compute list, the class mutex is locked during that time
+
 	uint32_t barrier_flags = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 	uint32_t access_flags = VK_ACCESS_SHADER_READ_BIT;
 	_compute_list_add_barrier(BARRIER_MASK_COMPUTE, barrier_flags, access_flags);
@@ -8199,9 +8242,13 @@ void RenderingDeviceVulkan::compute_list_end(BitField<BarrierMask> p_post_barrie
 		barrier_flags |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 		access_flags |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
 	}
-	if (p_post_barrier.has_flag(BARRIER_MASK_RASTER)) {
-		barrier_flags |= VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
+	if (p_post_barrier.has_flag(BARRIER_MASK_VERTEX)) {
+		barrier_flags |= VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
 		access_flags |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
+	}
+	if (p_post_barrier.has_flag(BARRIER_MASK_FRAGMENT)) {
+		barrier_flags |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
+		access_flags |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
 	}
 	if (p_post_barrier.has_flag(BARRIER_MASK_TRANSFER)) {
 		barrier_flags |= VK_PIPELINE_STAGE_TRANSFER_BIT;
@@ -8227,7 +8274,7 @@ void RenderingDeviceVulkan::barrier(BitField<BarrierMask> p_from, BitField<Barri
 			src_barrier_flags |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 			src_access_flags |= VK_ACCESS_SHADER_WRITE_BIT;
 		}
-		if (p_from.has_flag(BARRIER_MASK_RASTER)) {
+		if (p_from.has_flag(BARRIER_MASK_FRAGMENT)) {
 			src_barrier_flags |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
 			src_access_flags |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 		}
@@ -8247,9 +8294,13 @@ void RenderingDeviceVulkan::barrier(BitField<BarrierMask> p_from, BitField<Barri
 			dst_barrier_flags |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 			dst_access_flags |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
 		}
-		if (p_to.has_flag(BARRIER_MASK_RASTER)) {
-			dst_barrier_flags |= VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
+		if (p_to.has_flag(BARRIER_MASK_VERTEX)) {
+			dst_barrier_flags |= VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
 			dst_access_flags |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
+		}
+		if (p_to.has_flag(BARRIER_MASK_FRAGMENT)) {
+			dst_barrier_flags |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
+			dst_access_flags |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
 		}
 		if (p_to.has_flag(BARRIER_MASK_TRANSFER)) {
 			dst_barrier_flags |= VK_PIPELINE_STAGE_TRANSFER_BIT;
@@ -8606,6 +8657,8 @@ void RenderingDeviceVulkan::swap_buffers() {
 }
 
 void RenderingDeviceVulkan::submit() {
+	_THREAD_SAFE_METHOD_
+
 	ERR_FAIL_COND_MSG(local_device.is_null(), "Only local devices can submit and sync.");
 	ERR_FAIL_COND_MSG(local_device_processing, "device already submitted, call sync to wait until done.");
 
@@ -8617,6 +8670,8 @@ void RenderingDeviceVulkan::submit() {
 }
 
 void RenderingDeviceVulkan::sync() {
+	_THREAD_SAFE_METHOD_
+
 	ERR_FAIL_COND_MSG(local_device.is_null(), "Only local devices can submit and sync.");
 	ERR_FAIL_COND_MSG(!local_device_processing, "sync can only be called after a submit");
 

@@ -1176,6 +1176,12 @@ int TreeItem::get_button_by_id(int p_column, int p_id) const {
 	return -1;
 }
 
+void TreeItem::set_button_tooltip_text(int p_column, int p_index, const String &p_tooltip) {
+	ERR_FAIL_INDEX(p_column, cells.size());
+	ERR_FAIL_INDEX(p_index, cells[p_column].buttons.size());
+	cells.write[p_column].buttons.write[p_index].tooltip = p_tooltip;
+}
+
 void TreeItem::set_button(int p_column, int p_index, const Ref<Texture2D> &p_button) {
 	ERR_FAIL_COND(p_button.is_null());
 	ERR_FAIL_INDEX(p_column, cells.size());
@@ -1586,6 +1592,7 @@ void TreeItem::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_button_id", "column", "button_index"), &TreeItem::get_button_id);
 	ClassDB::bind_method(D_METHOD("get_button_by_id", "column", "id"), &TreeItem::get_button_by_id);
 	ClassDB::bind_method(D_METHOD("get_button", "column", "button_index"), &TreeItem::get_button);
+	ClassDB::bind_method(D_METHOD("set_button_tooltip_text", "column", "button_index", "tooltip"), &TreeItem::set_button_tooltip_text);
 	ClassDB::bind_method(D_METHOD("set_button", "column", "button_index", "button"), &TreeItem::set_button);
 	ClassDB::bind_method(D_METHOD("erase_button", "column", "button_index"), &TreeItem::erase_button);
 	ClassDB::bind_method(D_METHOD("set_button_disabled", "column", "button_index", "disabled"), &TreeItem::set_button_disabled);
@@ -1704,6 +1711,10 @@ void Tree::_update_theme_item_cache() {
 	theme_cache.drop_position_color = get_theme_color(SNAME("drop_position_color"));
 	theme_cache.h_separation = get_theme_constant(SNAME("h_separation"));
 	theme_cache.v_separation = get_theme_constant(SNAME("v_separation"));
+	theme_cache.inner_item_margin_bottom = get_theme_constant(SNAME("inner_item_margin_bottom"));
+	theme_cache.inner_item_margin_left = get_theme_constant(SNAME("inner_item_margin_left"));
+	theme_cache.inner_item_margin_right = get_theme_constant(SNAME("inner_item_margin_right"));
+	theme_cache.inner_item_margin_top = get_theme_constant(SNAME("inner_item_margin_top"));
 	theme_cache.item_margin = get_theme_constant(SNAME("item_margin"));
 	theme_cache.button_margin = get_theme_constant(SNAME("button_margin"));
 	theme_cache.icon_max_width = get_theme_constant(SNAME("icon_max_width"));
@@ -1841,13 +1852,14 @@ int Tree::get_item_height(TreeItem *p_item) const {
 void Tree::draw_item_rect(TreeItem::Cell &p_cell, const Rect2i &p_rect, const Color &p_color, const Color &p_icon_color, int p_ol_size, const Color &p_ol_color) {
 	ERR_FAIL_COND(theme_cache.font.is_null());
 
-	Rect2i rect = p_rect;
+	Rect2i rect = p_rect.grow_individual(-theme_cache.inner_item_margin_left, -theme_cache.inner_item_margin_top, -theme_cache.inner_item_margin_right, -theme_cache.inner_item_margin_bottom);
 	Size2 ts = p_cell.text_buf->get_size();
 	bool rtl = is_layout_rtl();
 
 	int w = 0;
+	Size2i bmsize;
 	if (!p_cell.icon.is_null()) {
-		Size2i bmsize = _get_cell_icon_size(p_cell);
+		bmsize = _get_cell_icon_size(p_cell);
 		w += bmsize.width + theme_cache.h_separation;
 		if (rect.size.width > 0 && (w + ts.width) > rect.size.width) {
 			ts.width = rect.size.width - w;
@@ -1886,8 +1898,6 @@ void Tree::draw_item_rect(TreeItem::Cell &p_cell, const Rect2i &p_rect, const Co
 	}
 
 	if (!p_cell.icon.is_null()) {
-		Size2i bmsize = _get_cell_icon_size(p_cell);
-
 		p_cell.draw_icon(ci, rect.position + Size2i(0, Math::floor((real_t)(rect.size.y - bmsize.y) / 2)), bmsize, p_icon_color);
 		rect.position.x += bmsize.x + theme_cache.h_separation;
 		rect.size.x -= bmsize.x + theme_cache.h_separation;

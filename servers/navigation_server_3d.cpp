@@ -82,7 +82,9 @@ void NavigationServer3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("region_get_navigation_layers", "region"), &NavigationServer3D::region_get_navigation_layers);
 	ClassDB::bind_method(D_METHOD("region_set_transform", "region", "transform"), &NavigationServer3D::region_set_transform);
 	ClassDB::bind_method(D_METHOD("region_set_navigation_mesh", "region", "navigation_mesh"), &NavigationServer3D::region_set_navigation_mesh);
+#ifndef DISABLE_DEPRECATED
 	ClassDB::bind_method(D_METHOD("region_bake_navigation_mesh", "navigation_mesh", "root_node"), &NavigationServer3D::region_bake_navigation_mesh);
+#endif // DISABLE_DEPRECATED
 	ClassDB::bind_method(D_METHOD("region_get_connections_count", "region"), &NavigationServer3D::region_get_connections_count);
 	ClassDB::bind_method(D_METHOD("region_get_connection_pathway_start", "region", "connection"), &NavigationServer3D::region_get_connection_pathway_start);
 	ClassDB::bind_method(D_METHOD("region_get_connection_pathway_end", "region", "connection"), &NavigationServer3D::region_get_connection_pathway_end);
@@ -183,10 +185,10 @@ NavigationServer3D::NavigationServer3D() {
 	ERR_FAIL_COND(singleton != nullptr);
 	singleton = this;
 
-	GLOBAL_DEF_BASIC("navigation/2d/default_cell_size", 1);
+	GLOBAL_DEF_BASIC("navigation/2d/default_cell_size", 1.0);
 	GLOBAL_DEF("navigation/2d/use_edge_connections", true);
-	GLOBAL_DEF_BASIC("navigation/2d/default_edge_connection_margin", 1);
-	GLOBAL_DEF_BASIC("navigation/2d/default_link_connection_radius", 4);
+	GLOBAL_DEF_BASIC("navigation/2d/default_edge_connection_margin", 1.0);
+	GLOBAL_DEF_BASIC("navigation/2d/default_link_connection_radius", 4.0);
 
 	GLOBAL_DEF_BASIC("navigation/3d/default_cell_size", 0.25);
 	GLOBAL_DEF_BASIC("navigation/3d/default_cell_height", 0.25);

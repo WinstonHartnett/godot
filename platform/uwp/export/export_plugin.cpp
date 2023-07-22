@@ -34,6 +34,7 @@
 
 #include "editor/editor_scale.h"
 #include "editor/editor_settings.h"
+#include "scene/resources/image_texture.h"
 
 #include "modules/modules_enabled.gen.h" // For svg and regex.
 #ifdef MODULE_SVG_ENABLED
@@ -265,7 +266,7 @@ Error EditorExportPlatformUWP::export_project(const Ref<EditorExportPreset> &p_p
 
 	String src_appx;
 
-	EditorProgress ep("export", "Exporting for UWP", 7, true);
+	EditorProgress ep("export", TTR("Exporting for UWP"), 7, true);
 
 	if (p_debug) {
 		src_appx = p_preset->get("custom_template/debug");
@@ -515,8 +516,7 @@ EditorExportPlatformUWP::EditorExportPlatformUWP() {
 	Ref<Image> img = memnew(Image);
 	const bool upsample = !Math::is_equal_approx(Math::round(EDSCALE), EDSCALE);
 
-	ImageLoaderSVG img_loader;
-	img_loader.create_image_from_string(img, _uwp_logo_svg, EDSCALE, upsample, false);
+	ImageLoaderSVG::create_image_from_string(img, _uwp_logo_svg, EDSCALE, upsample, false);
 
 	logo = ImageTexture::create_from_image(img);
 #endif

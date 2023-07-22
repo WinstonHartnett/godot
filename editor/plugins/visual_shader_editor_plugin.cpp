@@ -31,7 +31,6 @@
 #include "visual_shader_editor_plugin.h"
 
 #include "core/config/project_settings.h"
-#include "core/core_string_names.h"
 #include "core/io/resource_loader.h"
 #include "core/math/math_defs.h"
 #include "core/os/keyboard.h"
@@ -57,6 +56,9 @@
 #include "scene/gui/tree.h"
 #include "scene/gui/view_panner.h"
 #include "scene/main/window.h"
+#include "scene/resources/curve_texture.h"
+#include "scene/resources/image_texture.h"
+#include "scene/resources/style_box_flat.h"
 #include "scene/resources/visual_shader_nodes.h"
 #include "scene/resources/visual_shader_particle_nodes.h"
 #include "servers/display_server.h"
@@ -239,7 +241,7 @@ void VisualShaderGraphPlugin::update_curve(int p_node_id) {
 		if (tex->get_texture().is_valid()) {
 			links[p_node_id].curve_editors[0]->set_curve(tex->get_texture()->get_curve());
 		}
-		tex->emit_signal(CoreStringNames::get_singleton()->changed);
+		tex->emit_changed();
 	}
 }
 
@@ -253,7 +255,7 @@ void VisualShaderGraphPlugin::update_curve_xyz(int p_node_id) {
 			links[p_node_id].curve_editors[1]->set_curve(tex->get_texture()->get_curve_y());
 			links[p_node_id].curve_editors[2]->set_curve(tex->get_texture()->get_curve_z());
 		}
-		tex->emit_signal(CoreStringNames::get_singleton()->changed);
+		tex->emit_changed();
 	}
 }
 
@@ -560,9 +562,8 @@ void VisualShaderGraphPlugin::add_node(VisualShader::Type p_type, int p_id, bool
 	if (curve.is_valid()) {
 		custom_editor->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 
-		Callable ce = callable_mp(graph_plugin, &VisualShaderGraphPlugin::update_curve);
-		if (curve->get_texture().is_valid() && !curve->get_texture()->is_connected("changed", ce)) {
-			curve->get_texture()->connect("changed", ce.bind(p_id));
+		if (curve->get_texture().is_valid()) {
+			curve->get_texture()->connect_changed(callable_mp(graph_plugin, &VisualShaderGraphPlugin::update_curve).bind(p_id));
 		}
 
 		CurveEditor *curve_editor = memnew(CurveEditor);
@@ -578,9 +579,8 @@ void VisualShaderGraphPlugin::add_node(VisualShader::Type p_type, int p_id, bool
 	if (curve_xyz.is_valid()) {
 		custom_editor->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 
-		Callable ce = callable_mp(graph_plugin, &VisualShaderGraphPlugin::update_curve_xyz);
-		if (curve_xyz->get_texture().is_valid() && !curve_xyz->get_texture()->is_connected("changed", ce)) {
-			curve_xyz->get_texture()->connect("changed", ce.bind(p_id));
+		if (curve_xyz->get_texture().is_valid()) {
+			curve_xyz->get_texture()->connect_changed(callable_mp(graph_plugin, &VisualShaderGraphPlugin::update_curve_xyz).bind(p_id));
 		}
 
 		CurveEditor *curve_editor_x = memnew(CurveEditor);
@@ -1159,20 +1159,14 @@ void VisualShaderEditor::edit(VisualShader *p_visual_shader) {
 		visual_shader = Ref<VisualShader>(p_visual_shader);
 		graph_plugin->register_shader(visual_shader.ptr());
 
-		Callable ce = callable_mp(this, &VisualShaderEditor::_update_preview);
-		if (!visual_shader->is_connected("changed", ce)) {
-			visual_shader->connect("changed", ce);
-		}
+		visual_shader->connect_changed(callable_mp(this, &VisualShaderEditor::_update_preview));
 		visual_shader->set_graph_offset(graph->get_scroll_ofs() / EDSCALE);
 		_set_mode(visual_shader->get_mode());
 
 		_update_nodes();
 	} else {
 		if (visual_shader.is_valid()) {
-			Callable ce = callable_mp(this, &VisualShaderEditor::_update_preview);
-			if (visual_shader->is_connected("changed", ce)) {
-				visual_shader->disconnect("changed", ce);
-			}
+			visual_shader->disconnect_changed(callable_mp(this, &VisualShaderEditor::_update_preview));
 		}
 		visual_shader.unref();
 	}
@@ -3089,6 +3083,9 @@ void VisualShaderEditor::_add_node(int p_idx, const Vector<Variant> &p_ops, Stri
 		if (!is_native) {
 			vsnode->set_script(add_options[p_idx].script);
 		}
+		VisualShaderNodeCustom *custom_node = Object::cast_to<VisualShaderNodeCustom>(vsn);
+		ERR_FAIL_COND(!custom_node);
+		custom_node->update_ports();
 	}
 
 	bool is_texture2d = (Object::cast_to<VisualShaderNodeTexture>(vsnode.ptr()) != nullptr);
@@ -3217,15 +3214,25 @@ void VisualShaderEditor::_add_node(int p_idx, const Vector<Variant> &p_ops, Stri
 				undo_redo->add_undo_method(graph_plugin.ptr(), "disconnect_nodes", type, from_node, from_slot, _to_node, _to_slot);
 				undo_redo->add_do_method(graph_plugin.ptr(), "connect_nodes", type, from_node, from_slot, _to_node, _to_slot);
 			} else {
-				// Attempting to connect to the first correct port.
+				int _to_slot = -1;
+
+				// Attempting to connect to the default input port or to the first correct port (if it's not found).
 				for (int i = 0; i < vsnode->get_input_port_count(); i++) {
 					if (visual_shader->is_port_types_compatible(output_port_type, vsnode->get_input_port_type(i))) {
-						undo_redo->add_undo_method(visual_shader.ptr(), "disconnect_nodes", type, from_node, from_slot, _to_node, i);
-						undo_redo->add_do_method(visual_shader.ptr(), "connect_nodes", type, from_node, from_slot, _to_node, i);
-						undo_redo->add_undo_method(graph_plugin.ptr(), "disconnect_nodes", type, from_node, from_slot, _to_node, i);
-						undo_redo->add_do_method(graph_plugin.ptr(), "connect_nodes", type, from_node, from_slot, _to_node, i);
-						break;
+						if (i == vsnode->get_default_input_port(output_port_type)) {
+							_to_slot = i;
+							break;
+						} else if (_to_slot == -1) {
+							_to_slot = i;
+						}
 					}
+				}
+
+				if (_to_slot >= 0) {
+					undo_redo->add_undo_method(visual_shader.ptr(), "disconnect_nodes", type, from_node, from_slot, _to_node, _to_slot);
+					undo_redo->add_do_method(visual_shader.ptr(), "connect_nodes", type, from_node, from_slot, _to_node, _to_slot);
+					undo_redo->add_undo_method(graph_plugin.ptr(), "disconnect_nodes", type, from_node, from_slot, _to_node, _to_slot);
+					undo_redo->add_do_method(graph_plugin.ptr(), "connect_nodes", type, from_node, from_slot, _to_node, _to_slot);
 				}
 			}
 
@@ -6447,7 +6454,7 @@ public:
 			properties[i]->update_property();
 			properties[i]->set_name_split_ratio(0);
 		}
-		node->connect("changed", callable_mp(this, &VisualShaderNodePluginDefaultEditor::_node_changed));
+		node->connect_changed(callable_mp(this, &VisualShaderNodePluginDefaultEditor::_node_changed));
 	}
 
 	static void _bind_methods() {
@@ -6713,7 +6720,7 @@ void VisualShaderNodePortPreview::_shader_changed() {
 
 void VisualShaderNodePortPreview::setup(const Ref<VisualShader> &p_shader, VisualShader::Type p_type, int p_node, int p_port, bool p_is_valid) {
 	shader = p_shader;
-	shader->connect("changed", callable_mp(this, &VisualShaderNodePortPreview::_shader_changed), CONNECT_DEFERRED);
+	shader->connect_changed(callable_mp(this, &VisualShaderNodePortPreview::_shader_changed), CONNECT_DEFERRED);
 	type = p_type;
 	port = p_port;
 	node = p_node;

@@ -60,7 +60,9 @@
 #include "scene/gui/tab_container.h"
 #include "scene/main/window.h"
 #include "scene/property_utils.h"
+#include "scene/resources/image_texture.h"
 #include "scene/resources/packed_scene.h"
+#include "scene/resources/portable_compressed_texture.h"
 #include "servers/display_server.h"
 #include "servers/navigation_server_3d.h"
 #include "servers/physics_server_2d.h"
@@ -1411,7 +1413,7 @@ void EditorNode::_dialog_display_load_error(String p_file, Error p_error) {
 				show_accept(vformat(TTR("Scene file '%s' appears to be invalid/corrupt."), p_file.get_file()), TTR("OK"));
 			} break;
 			case ERR_FILE_NOT_FOUND: {
-				show_accept(vformat(TTR("Missing file '%s' or one its dependencies."), p_file.get_file()), TTR("OK"));
+				show_accept(vformat(TTR("Missing file '%s' or one of its dependencies."), p_file.get_file()), TTR("OK"));
 			} break;
 			default: {
 				show_accept(vformat(TTR("Error while loading file '%s'."), p_file.get_file()), TTR("OK"));
@@ -2775,6 +2777,11 @@ void EditorNode::_menu_option_confirm(int p_option, bool p_confirmed) {
 		case FILE_QUIT:
 		case RUN_PROJECT_MANAGER:
 		case RELOAD_CURRENT_PROJECT: {
+			if (p_confirmed && plugin_to_save) {
+				plugin_to_save->save_external_data();
+				p_confirmed = false;
+			}
+
 			if (!p_confirmed) {
 				bool save_each = EDITOR_GET("interface/editor/save_each_scene_on_quit");
 				if (_next_unsaved_scene(!save_each) == -1) {
@@ -2788,6 +2795,28 @@ void EditorNode::_menu_option_confirm(int p_option, bool p_confirmed) {
 						}
 						save_confirmation->reset_size();
 						save_confirmation->popup_centered();
+						break;
+					}
+
+					plugin_to_save = nullptr;
+					for (int i = 0; i < editor_data.get_editor_plugin_count(); i++) {
+						const String unsaved_status = editor_data.get_editor_plugin(i)->get_unsaved_status();
+						if (!unsaved_status.is_empty()) {
+							if (p_option == RELOAD_CURRENT_PROJECT) {
+								save_confirmation->set_ok_button_text(TTR("Save & Reload"));
+								save_confirmation->set_text(unsaved_status);
+							} else {
+								save_confirmation->set_ok_button_text(TTR("Save & Quit"));
+								save_confirmation->set_text(unsaved_status);
+							}
+							save_confirmation->reset_size();
+							save_confirmation->popup_centered();
+							plugin_to_save = editor_data.get_editor_plugin(i);
+							break;
+						}
+					}
+
+					if (plugin_to_save) {
 						break;
 					}
 
@@ -3029,13 +3058,21 @@ int EditorNode::_next_unsaved_scene(bool p_valid_filename, int p_start) {
 		if (!editor_data.get_edited_scene_root(i)) {
 			continue;
 		}
+
+		String scene_filename = editor_data.get_edited_scene_root(i)->get_scene_file_path();
+		if (p_valid_filename && scene_filename.is_empty()) {
+			continue;
+		}
+
 		bool unsaved = EditorUndoRedoManager::get_singleton()->is_history_unsaved(editor_data.get_scene_history_id(i));
 		if (unsaved) {
-			String scene_filename = editor_data.get_edited_scene_root(i)->get_scene_file_path();
-			if (p_valid_filename && scene_filename.is_empty()) {
-				continue;
-			}
 			return i;
+		} else {
+			for (int j = 0; j < editor_data.get_editor_plugin_count(); j++) {
+				if (!editor_data.get_editor_plugin(j)->get_unsaved_status(scene_filename).is_empty()) {
+					return i;
+				}
+			}
 		}
 	}
 	return -1;
@@ -3190,7 +3227,7 @@ void EditorNode::add_editor_plugin(EditorPlugin *p_editor, bool p_config_changed
 		if (icon.is_valid()) {
 			tb->set_icon(icon);
 			// Make sure the control is updated if the icon is reimported.
-			icon->connect("changed", callable_mp((Control *)tb, &Control::update_minimum_size));
+			icon->connect_changed(callable_mp((Control *)tb, &Control::update_minimum_size));
 		} else if (singleton->gui_base->has_theme_icon(p_editor->get_name(), SNAME("EditorIcons"))) {
 			tb->set_icon(singleton->gui_base->get_theme_icon(p_editor->get_name(), SNAME("EditorIcons")));
 		}
@@ -3326,6 +3363,11 @@ void EditorNode::set_addon_plugin_enabled(const String &p_addon, bool p_enabled,
 		return;
 	}
 
+	String plugin_version;
+	if (cf->has_section_key("plugin", "version")) {
+		plugin_version = cf->get_value("plugin", "version");
+	}
+
 	if (!cf->has_section_key("plugin", "script")) {
 		show_warning(vformat(TTR("Unable to find script field for addon plugin at: '%s'."), addon_path));
 		return;
@@ -3371,6 +3413,7 @@ void EditorNode::set_addon_plugin_enabled(const String &p_addon, bool p_enabled,
 
 	EditorPlugin *ep = memnew(EditorPlugin);
 	ep->set_script(scr);
+	ep->set_plugin_version(plugin_version);
 	addon_name_to_plugin[addon_path] = ep;
 	add_editor_plugin(ep, p_config_changed);
 
@@ -4376,6 +4419,9 @@ String EditorNode::_get_system_info() const {
 		godot_version += " " + hash;
 	}
 
+#ifdef LINUXBSD_ENABLED
+	const String display_server = OS::get_singleton()->get_environment("XDG_SESSION_TYPE").capitalize().replace(" ", ""); // `replace` is necessary, because `capitalize` introduces a whitespace between "x" and "11".
+#endif // LINUXBSD_ENABLED
 	String driver_name = GLOBAL_GET("rendering/rendering_device/driver");
 	String rendering_method = GLOBAL_GET("rendering/renderer/rendering_method");
 
@@ -4407,17 +4453,18 @@ String EditorNode::_get_system_info() const {
 	const int processor_count = OS::get_singleton()->get_processor_count();
 
 	// Prettify
-	if (driver_name == "vulkan") {
-		driver_name = "Vulkan";
-	} else if (driver_name == "opengl3") {
-		driver_name = "GLES3";
-	}
 	if (rendering_method == "forward_plus") {
 		rendering_method = "Forward+";
 	} else if (rendering_method == "mobile") {
 		rendering_method = "Mobile";
 	} else if (rendering_method == "gl_compatibility") {
 		rendering_method = "Compatibility";
+		driver_name = GLOBAL_GET("rendering/gl_compatibility/driver");
+	}
+	if (driver_name == "vulkan") {
+		driver_name = "Vulkan";
+	} else if (driver_name == "opengl3") {
+		driver_name = "GLES3";
 	}
 
 	// Join info.
@@ -4428,6 +4475,11 @@ String EditorNode::_get_system_info() const {
 	} else {
 		info.push_back(distribution_name);
 	}
+#ifdef LINUXBSD_ENABLED
+	if (!display_server.is_empty()) {
+		info.push_back(display_server);
+	}
+#endif // LINUXBSD_ENABLED
 	info.push_back(vformat("%s (%s)", driver_name, rendering_method));
 
 	String graphics;
@@ -5545,19 +5597,36 @@ void EditorNode::_scene_tab_closed(int p_tab, int p_option) {
 		return;
 	}
 
-	bool unsaved = EditorUndoRedoManager::get_singleton()->is_history_unsaved(editor_data.get_scene_history_id(p_tab));
-	if (unsaved) {
+	String scene_filename = scene->get_scene_file_path();
+	String unsaved_message;
+
+	if (EditorUndoRedoManager::get_singleton()->is_history_unsaved(editor_data.get_scene_history_id(p_tab))) {
+		if (scene_filename.is_empty()) {
+			unsaved_message = TTR("This scene was never saved.");
+		} else {
+			unsaved_message = vformat(TTR("Scene \"%s\" has unsaved changes."), scene_filename);
+		}
+	} else {
+		// Check if any plugin has unsaved changes in that scene.
+		for (int i = 0; i < editor_data.get_editor_plugin_count(); i++) {
+			unsaved_message = editor_data.get_editor_plugin(i)->get_unsaved_status(scene_filename);
+			if (!unsaved_message.is_empty()) {
+				break;
+			}
+		}
+	}
+
+	if (!unsaved_message.is_empty()) {
 		if (get_current_tab() != p_tab) {
 			set_current_scene(p_tab);
 		}
 
-		String scene_filename = scene->get_scene_file_path();
 		if (current_menu_option == RELOAD_CURRENT_PROJECT) {
 			save_confirmation->set_ok_button_text(TTR("Save & Reload"));
-			save_confirmation->set_text(vformat(TTR("Save changes to '%s' before reloading?"), !scene_filename.is_empty() ? scene_filename : "unsaved scene"));
+			save_confirmation->set_text(unsaved_message + "\n\n" + TTR("Save before reloading?"));
 		} else {
 			save_confirmation->set_ok_button_text(TTR("Save & Close"));
-			save_confirmation->set_text(vformat(TTR("Save changes to '%s' before closing?"), !scene_filename.is_empty() ? scene_filename : "unsaved scene"));
+			save_confirmation->set_text(unsaved_message + "\n\n" + TTR("Save before closing?"));
 		}
 		save_confirmation->reset_size();
 		save_confirmation->popup_centered();

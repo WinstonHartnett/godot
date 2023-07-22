@@ -30,6 +30,8 @@
 
 #include "visual_shader_nodes.h"
 
+#include "scene/resources/image_texture.h"
+
 ////////////// Vector Base
 
 VisualShaderNodeVectorBase::PortType VisualShaderNodeVectorBase::get_input_port_type(int p_port) const {
@@ -4135,6 +4137,10 @@ String VisualShaderNodeStep::get_input_port_name(int p_port) const {
 	return String();
 }
 
+int VisualShaderNodeStep::get_default_input_port(PortType p_type) const {
+	return 1;
+}
+
 int VisualShaderNodeStep::get_output_port_count() const {
 	return 1;
 }
@@ -4288,6 +4294,10 @@ String VisualShaderNodeSmoothStep::get_input_port_name(int p_port) const {
 			return "x";
 	}
 	return String();
+}
+
+int VisualShaderNodeSmoothStep::get_default_input_port(PortType p_type) const {
+	return 2;
 }
 
 int VisualShaderNodeSmoothStep::get_output_port_count() const {
