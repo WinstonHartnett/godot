@@ -39,6 +39,8 @@
 #define _THREAD_SAFE_UNLOCK_ _thread_safe_.unlock();
 
 bool is_current_thread_safe_for_nodes();
+bool is_current_thread_safe_for_scene_tree();
 void set_current_thread_safe_for_nodes(bool p_safe);
+void set_current_thread_safe_for_scene_tree(bool p_safe);
 
 #endif // THREAD_SAFE_H

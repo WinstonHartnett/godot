@@ -366,7 +366,7 @@ void Node::_propagate_exit_tree() {
 }
 
 void Node::move_child(Node *p_child, int p_index) {
-	ERR_FAIL_COND_MSG(data.inside_tree && !Thread::is_main_thread(), "Moving child node positions inside the SceneTree is only allowed from the main thread. Use call_deferred(\"move_child\",child,index).");
+	ERR_FAIL_COND_MSG(data.inside_tree && !(Thread::is_main_thread() || is_current_thread_safe_for_scene_tree()), "Moving child node positions inside the SceneTree is only allowed from the main thread. Use call_deferred(\"move_child\",child,index).");
 	ERR_FAIL_NULL(p_child);
 	ERR_FAIL_COND_MSG(p_child->data.parent != this, "Child is not a child of this node.");
 
@@ -997,7 +997,7 @@ int Node::get_physics_process_priority() const {
 }
 
 void Node::set_process_thread_group(ProcessThreadGroup p_mode) {
-	ERR_FAIL_COND_MSG(data.inside_tree && !Thread::is_main_thread(), "Changing the process thread group can only be done from the main thread. Use call_deferred(\"set_process_thread_group\",mode).");
+	ERR_FAIL_COND_MSG(data.inside_tree && !(Thread::is_main_thread() || is_current_thread_safe_for_scene_tree()), "Changing the process thread group can only be done from the main thread. Use call_deferred(\"set_process_thread_group\",mode).");
 	if (data.process_thread_group == p_mode) {
 		return;
 	}
@@ -1142,7 +1142,7 @@ void Node::_set_name_nocheck(const StringName &p_name) {
 }
 
 void Node::set_name(const String &p_name) {
-	ERR_FAIL_COND_MSG(data.inside_tree && !Thread::is_main_thread(), "Changing the name to nodes inside the SceneTree is only allowed from the main thread. Use `set_name.call_deferred(new_name)`.");
+	ERR_FAIL_COND_MSG(data.inside_tree && !(Thread::is_main_thread() || is_current_thread_safe_for_scene_tree()), "Changing the name to nodes inside the SceneTree is only allowed from the main thread. Use `set_name.call_deferred(new_name)`.");
 	String name = p_name.validate_node_name();
 
 	ERR_FAIL_COND(name.is_empty());
@@ -1388,7 +1388,7 @@ void Node::_add_child_nocheck(Node *p_child, const StringName &p_name, InternalM
 }
 
 void Node::add_child(Node *p_child, bool p_force_readable_name, InternalMode p_internal) {
-	ERR_FAIL_COND_MSG(data.inside_tree && !Thread::is_main_thread(), "Adding children to a node inside the SceneTree is only allowed from the main thread. Use call_deferred(\"add_child\",node).");
+	ERR_FAIL_COND_MSG(data.inside_tree && !(Thread::is_main_thread() || is_current_thread_safe_for_scene_tree()), "Adding children to a node inside the SceneTree is only allowed from the main thread. Use call_deferred(\"add_child\",node).");
 
 	ERR_THREAD_GUARD
 	ERR_FAIL_NULL(p_child);
@@ -1404,7 +1404,7 @@ void Node::add_child(Node *p_child, bool p_force_readable_name, InternalMode p_i
 }
 
 void Node::add_sibling(Node *p_sibling, bool p_force_readable_name) {
-	ERR_FAIL_COND_MSG(data.inside_tree && !Thread::is_main_thread(), "Adding a sibling to a node inside the SceneTree is only allowed from the main thread. Use call_deferred(\"add_sibling\",node).");
+	ERR_FAIL_COND_MSG(data.inside_tree && !(Thread::is_main_thread() || is_current_thread_safe_for_scene_tree()), "Adding a sibling to a node inside the SceneTree is only allowed from the main thread. Use call_deferred(\"add_sibling\",node).");
 	ERR_FAIL_NULL(p_sibling);
 	ERR_FAIL_COND_MSG(p_sibling == this, vformat("Can't add sibling '%s' to itself.", p_sibling->get_name())); // adding to itself!
 	ERR_FAIL_NULL(data.parent);
@@ -1416,7 +1416,7 @@ void Node::add_sibling(Node *p_sibling, bool p_force_readable_name) {
 }
 
 void Node::remove_child(Node *p_child) {
-	ERR_FAIL_COND_MSG(data.inside_tree && !Thread::is_main_thread(), "Removing children from a node inside the SceneTree is only allowed from the main thread. Use call_deferred(\"remove_child\",node).");
+	ERR_FAIL_COND_MSG(data.inside_tree && !(Thread::is_main_thread() || is_current_thread_safe_for_scene_tree()), "Removing children from a node inside the SceneTree is only allowed from the main thread. Use call_deferred(\"remove_child\",node).");
 	ERR_FAIL_NULL(p_child);
 	ERR_FAIL_COND_MSG(data.blocked > 0, "Parent node is busy adding/removing children, `remove_child()` can't be called at this time. Consider using `remove_child.call_deferred(child)` instead.");
 	ERR_FAIL_COND(p_child->data.parent != this);
