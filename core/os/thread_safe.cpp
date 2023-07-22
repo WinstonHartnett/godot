@@ -33,17 +33,17 @@
 
 #include "thread_safe.h"
 
-static thread_local uint8_t current_thread_safety = 0; // 0: unsafe, 1: safe for nodes, 2: safe for nodes and scene
+static thread_local uint8_t current_thread_safety = 0; // by default, checks disabled
 
 const uint8_t node_safe_mask = 1 << 0;
 const uint8_t scene_safe_mask = 1 << 1;
 
 bool is_current_thread_safe_for_nodes() {
-	return current_thread_safety > 0;
+	return (current_thread_safety & node_safe_mask) >> 0;
 }
 
 bool is_current_thread_safe_for_scene_tree() {
-	return current_thread_safety == 2;
+	return (current_thread_safety & scene_safe_mask) >> 1;
 }
 
 void set_current_thread_safe_for_nodes(bool p_safe) {

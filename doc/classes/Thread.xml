@@ -50,6 +50,13 @@
 				[b]Note:[/b] Even in the case of having disabled the checks in a [WorkerThreadPool] task, there's no need to re-enable them at the end. The engine will do so.
 			</description>
 		</method>
+		<method name="set_scene_safety_checks_enabled" qualifiers="static">
+			<return type="void" />
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				TODO
+			</description>
+		</method>
 		<method name="start">
 			<return type="int" enum="Error" />
 			<param index="0" name="callable" type="Callable" />

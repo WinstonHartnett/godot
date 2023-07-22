@@ -412,6 +412,7 @@ public:
 	Variant wait_to_finish();
 
 	static void set_thread_safety_checks_enabled(bool p_enabled);
+	static void set_thread_scene_checks_enabled(bool p_enabled);
 };
 
 namespace special {
