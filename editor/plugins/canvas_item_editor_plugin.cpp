@@ -44,20 +44,15 @@
 #include "editor/plugins/animation_player_editor_plugin.h"
 #include "editor/plugins/script_editor_plugin.h"
 #include "editor/scene_tree_dock.h"
-#include "scene/2d/cpu_particles_2d.h"
-#include "scene/2d/gpu_particles_2d.h"
-#include "scene/2d/light_2d.h"
 #include "scene/2d/polygon_2d.h"
 #include "scene/2d/skeleton_2d.h"
 #include "scene/2d/sprite_2d.h"
 #include "scene/2d/touch_screen_button.h"
 #include "scene/gui/flow_container.h"
 #include "scene/gui/grid_container.h"
-#include "scene/gui/nine_patch_rect.h"
 #include "scene/gui/separator.h"
 #include "scene/gui/split_container.h"
 #include "scene/gui/subviewport_container.h"
-#include "scene/gui/texture_rect.h"
 #include "scene/gui/view_panner.h"
 #include "scene/main/canvas_layer.h"
 #include "scene/main/window.h"
@@ -259,7 +254,7 @@ bool CanvasItemEditor::_is_node_movable(const Node *p_node, bool p_popup_warning
 	}
 	if (Object::cast_to<Control>(p_node) && Object::cast_to<Container>(p_node->get_parent())) {
 		if (p_popup_warning) {
-			EditorToaster::get_singleton()->popup_str("Children of a container get their position and size determined only by their parent.", EditorToaster::SEVERITY_WARNING);
+			EditorToaster::get_singleton()->popup_str(TTR("Children of a container get their position and size determined only by their parent."), EditorToaster::SEVERITY_WARNING);
 		}
 		return false;
 	}
@@ -1160,7 +1155,11 @@ bool CanvasItemEditor::_gui_input_rulers_and_guides(const Ref<InputEvent> &p_eve
 							vguides.push_back(edited.x);
 							undo_redo->create_action(TTR("Create Vertical Guide"));
 							undo_redo->add_do_method(EditorNode::get_singleton()->get_edited_scene(), "set_meta", "_edit_vertical_guides_", vguides);
-							undo_redo->add_undo_method(EditorNode::get_singleton()->get_edited_scene(), "set_meta", "_edit_vertical_guides_", prev_vguides);
+							if (prev_vguides.is_empty()) {
+								undo_redo->add_undo_method(EditorNode::get_singleton()->get_edited_scene(), "remove_meta", "_edit_vertical_guides_");
+							} else {
+								undo_redo->add_undo_method(EditorNode::get_singleton()->get_edited_scene(), "set_meta", "_edit_vertical_guides_", prev_vguides);
+							}
 							undo_redo->add_undo_method(viewport, "queue_redraw");
 							undo_redo->commit_action();
 						}
@@ -1193,7 +1192,11 @@ bool CanvasItemEditor::_gui_input_rulers_and_guides(const Ref<InputEvent> &p_eve
 							hguides.push_back(edited.y);
 							undo_redo->create_action(TTR("Create Horizontal Guide"));
 							undo_redo->add_do_method(EditorNode::get_singleton()->get_edited_scene(), "set_meta", "_edit_horizontal_guides_", hguides);
-							undo_redo->add_undo_method(EditorNode::get_singleton()->get_edited_scene(), "set_meta", "_edit_horizontal_guides_", prev_hguides);
+							if (prev_hguides.is_empty()) {
+								undo_redo->add_undo_method(EditorNode::get_singleton()->get_edited_scene(), "remove_meta", "_edit_horizontal_guides_");
+							} else {
+								undo_redo->add_undo_method(EditorNode::get_singleton()->get_edited_scene(), "set_meta", "_edit_horizontal_guides_", prev_hguides);
+							}
 							undo_redo->add_undo_method(viewport, "queue_redraw");
 							undo_redo->commit_action();
 						}
@@ -1221,8 +1224,16 @@ bool CanvasItemEditor::_gui_input_rulers_and_guides(const Ref<InputEvent> &p_eve
 						undo_redo->create_action(TTR("Create Horizontal and Vertical Guides"));
 						undo_redo->add_do_method(EditorNode::get_singleton()->get_edited_scene(), "set_meta", "_edit_vertical_guides_", vguides);
 						undo_redo->add_do_method(EditorNode::get_singleton()->get_edited_scene(), "set_meta", "_edit_horizontal_guides_", hguides);
-						undo_redo->add_undo_method(EditorNode::get_singleton()->get_edited_scene(), "set_meta", "_edit_vertical_guides_", prev_vguides);
-						undo_redo->add_undo_method(EditorNode::get_singleton()->get_edited_scene(), "set_meta", "_edit_horizontal_guides_", prev_hguides);
+						if (prev_vguides.is_empty()) {
+							undo_redo->add_undo_method(EditorNode::get_singleton()->get_edited_scene(), "remove_meta", "_edit_vertical_guides_");
+						} else {
+							undo_redo->add_undo_method(EditorNode::get_singleton()->get_edited_scene(), "set_meta", "_edit_vertical_guides_", prev_vguides);
+						}
+						if (prev_hguides.is_empty()) {
+							undo_redo->add_undo_method(EditorNode::get_singleton()->get_edited_scene(), "remove_meta", "_edit_horizontal_guides_");
+						} else {
+							undo_redo->add_undo_method(EditorNode::get_singleton()->get_edited_scene(), "set_meta", "_edit_horizontal_guides_", prev_hguides);
+						}
 						undo_redo->add_undo_method(viewport, "queue_redraw");
 						undo_redo->commit_action();
 					}
@@ -1289,7 +1300,7 @@ void CanvasItemEditor::_pan_callback(Vector2 p_scroll_vec, Ref<InputEvent> p_eve
 void CanvasItemEditor::_zoom_callback(float p_zoom_factor, Vector2 p_origin, Ref<InputEvent> p_event) {
 	Ref<InputEventMouseButton> mb = p_event;
 	if (mb.is_valid()) {
-		// Special behvior for scroll events, as the zoom_by_increment method can smartly end up on powers of two.
+		// Special behavior for scroll events, as the zoom_by_increment method can smartly end up on powers of two.
 		int increment = p_zoom_factor > 1.0 ? 1 : -1;
 		bool by_integer = mb->is_alt_pressed();
 
@@ -2282,8 +2293,8 @@ bool CanvasItemEditor::_gui_input_select(const Ref<InputEvent> &p_event) {
 
 		if (b.is_valid() && b->is_pressed() && b->get_button_index() == MouseButton::RIGHT) {
 			add_node_menu->clear();
-			add_node_menu->add_icon_item(get_theme_icon(SNAME("Add"), SNAME("EditorIcons")), TTR("Add Node Here"), ADD_NODE);
-			add_node_menu->add_icon_item(get_theme_icon(SNAME("Instance"), SNAME("EditorIcons")), TTR("Instantiate Scene Here"), ADD_INSTANCE);
+			add_node_menu->add_icon_item(get_theme_icon(SNAME("Add"), SNAME("EditorIcons")), TTR("Add Node Here..."), ADD_NODE);
+			add_node_menu->add_icon_item(get_theme_icon(SNAME("Instance"), SNAME("EditorIcons")), TTR("Instantiate Scene Here..."), ADD_INSTANCE);
 			for (Node *node : SceneTreeDock::get_singleton()->get_node_clipboard()) {
 				if (Object::cast_to<CanvasItem>(node)) {
 					add_node_menu->add_icon_item(get_theme_icon(SNAME("ActionPaste"), SNAME("EditorIcons")), TTR("Paste Node(s) Here"), ADD_PASTE);
@@ -3027,8 +3038,8 @@ void CanvasItemEditor::_draw_ruler_tool() {
 			Point2 v_angle_text_pos;
 			v_angle_text_pos.x = CLAMP(begin.x - angle_text_width / 2, angle_text_width / 2, viewport->get_rect().size.x - angle_text_width);
 			v_angle_text_pos.y = begin.y < end.y ? MIN(text_pos2.y - 2 * text_height, begin.y - text_height * 0.5) : MAX(text_pos2.y + text_height * 3, begin.y + text_height * 1.5);
-			viewport->draw_string_outline(font, v_angle_text_pos, TS->format_number(vformat(String::utf8("%d°"), vertical_angle)), HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, outline_size, outline_color);
-			viewport->draw_string(font, v_angle_text_pos, TS->format_number(vformat(String::utf8("%d°"), vertical_angle)), HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, font_secondary_color);
+			viewport->draw_string_outline(font, v_angle_text_pos, TS->format_number(vformat(U"%d°", vertical_angle)), HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, outline_size, outline_color);
+			viewport->draw_string(font, v_angle_text_pos, TS->format_number(vformat(U"%d°", vertical_angle)), HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, font_secondary_color);
 
 			text_pos2 = text_pos;
 			text_pos2.y = end.y < text_pos.y ? MIN(text_pos.y - text_height * 2, end.y - text_height / 2) : MAX(text_pos.y + text_height * 2, end.y - text_height / 2);
@@ -3050,8 +3061,8 @@ void CanvasItemEditor::_draw_ruler_tool() {
 					h_angle_text_pos.y = MIN(text_pos.y - height_multiplier * text_height, MIN(end.y - text_height * 0.5, text_pos2.y - height_multiplier * text_height));
 				}
 			}
-			viewport->draw_string_outline(font, h_angle_text_pos, TS->format_number(vformat(String::utf8("%d°"), horizontal_angle)), HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, outline_size, outline_color);
-			viewport->draw_string(font, h_angle_text_pos, TS->format_number(vformat(String::utf8("%d°"), horizontal_angle)), HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, font_secondary_color);
+			viewport->draw_string_outline(font, h_angle_text_pos, TS->format_number(vformat(U"%d°", horizontal_angle)), HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, outline_size, outline_color);
+			viewport->draw_string(font, h_angle_text_pos, TS->format_number(vformat(U"%d°", horizontal_angle)), HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, font_secondary_color);
 		}
 
 		if (grid_snap_active) {
@@ -5079,7 +5090,7 @@ CanvasItemEditor::CanvasItemEditor() {
 
 	viewport->add_child(controls_vb);
 
-	// Add some margin to the left for better aesthetics.
+	// Add some margin to the left for better esthetics.
 	// This prevents the first button's hover/pressed effect from "touching" the panel's border,
 	// which looks ugly.
 	Control *margin_left = memnew(Control);
@@ -5722,7 +5733,7 @@ void CanvasItemEditorViewport::_perform_drop_data() {
 		} else {
 			Ref<Texture2D> texture = Ref<Texture2D>(Object::cast_to<Texture2D>(*res));
 			if (texture != nullptr && texture.is_valid()) {
-				Node *child = _make_texture_node_type(default_texture_node_type);
+				Node *child = Object::cast_to<Node>(ClassDB::instantiate(default_texture_node_type));
 				_create_nodes(target_node, child, path, drop_pos);
 			}
 		}
@@ -5851,30 +5862,6 @@ void CanvasItemEditorViewport::drop_data(const Point2 &p_point, const Variant &p
 	} else {
 		_perform_drop_data();
 	}
-}
-
-Node *CanvasItemEditorViewport::_make_texture_node_type(String texture_node_type) {
-	Node *node = nullptr;
-	if (texture_node_type == "Sprite2D") {
-		node = memnew(Sprite2D);
-	} else if (texture_node_type == "PointLight2D") {
-		node = memnew(PointLight2D);
-	} else if (texture_node_type == "CPUParticles2D") {
-		node = memnew(CPUParticles2D);
-	} else if (texture_node_type == "GPUParticles2D") {
-		node = memnew(GPUParticles2D);
-	} else if (texture_node_type == "Polygon2D") {
-		node = memnew(Polygon2D);
-	} else if (texture_node_type == "TouchScreenButton") {
-		node = memnew(TouchScreenButton);
-	} else if (texture_node_type == "TextureRect") {
-		node = memnew(TextureRect);
-	} else if (texture_node_type == "TextureButton") {
-		node = memnew(TextureButton);
-	} else if (texture_node_type == "NinePatchRect") {
-		node = memnew(NinePatchRect);
-	}
-	return node;
 }
 
 void CanvasItemEditorViewport::_update_theme() {

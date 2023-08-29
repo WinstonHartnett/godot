@@ -299,6 +299,24 @@ Files extracted from upstream source:
 - `jpge*.{c,h}`
 
 
+## libktx
+
+- Upstream: https://github.com/KhronosGroup/KTX-Software
+- Version: 4.1.0 (d7255fe73cd53b856731ceb9f2c279181d0dbbca, 2023)
+- License: Apache-2.0
+
+Files extracted from upstream source:
+
+- `LICENSE.md`
+- `include/*`
+- `lib/dfdutils/{LICENSES/Apache-2.0.txt,KHR,*.c,*.h,*.inl}`
+- `lib/{basis_sgd.h,basis_transcode.cpp,checkheader.c,filestream.*,formatsize.h,gl_format.h,hashlist.c,ktxint.h,memstream.*,swap.c,texture*,uthash.h,vk_format.h,vkformat_enum.h}`
+- `utils/unused.h`
+- `other_include/KHR/*`
+
+Some Godot-specific changes are applied via `godot.patch`.
+
+
 ## libogg
 
 - Upstream: https://www.xiph.org/ogg
@@ -315,14 +333,14 @@ Files extracted from upstream source:
 ## libpng
 
 - Upstream: http://libpng.org/pub/png/libpng.html
-- Version: 1.6.38 (0a158f3506502dfa23edfc42790dfaed82efba17, 2022)
+- Version: 1.6.40 (f135775ad4e5d4408d2e12ffcc71bb36e6b48551, 2023)
 - License: libpng/zlib
 
 Files extracted from upstream source:
 
 - all .c and .h files of the main directory, except from
   `example.c` and `pngtest.c`
-- the arm/ folder
+- `arm/`, `intel/` and `powerpc/` folders
 - `scripts/pnglibconf.h.prebuilt` as `pnglibconf.h`
 - `LICENSE`
 
@@ -356,7 +374,7 @@ Files extracted from upstream source:
 ## libwebp
 
 - Upstream: https://chromium.googlesource.com/webm/libwebp/
-- Version: 1.3.0 (b557776962a3dcc985d83bd4ed94e1e2e50d0fa2, 2022)
+- Version: 1.3.1 (fd7bb21c0cb56e8a82e9bfa376164b842f433f3b, 2023)
 - License: BSD-3-Clause
 
 Files extracted from upstream source:
@@ -370,7 +388,7 @@ Patch `godot-node-debug-fix.patch` workarounds shadowing of godot's Node class i
 ## mbedtls
 
 - Upstream: https://github.com/Mbed-TLS/mbedtls
-- Version: 2.18.3 (981743de6fcdbe672e482b6fd724d31d0a0d2476, 2023)
+- Version: 2.28.4 (aeb97a18913a86f051afab11b2c92c6be0c2eb83, 2023)
 - License: Apache 2.0
 
 File extracted from upstream release tarball:
@@ -422,7 +440,7 @@ to solve some MSVC warnings. See the patches in the `patches` directory.
 ## miniupnpc
 
 - Upstream: https://github.com/miniupnp/miniupnp
-- Version: 2.2.4 (7d1d8bc3868b08ad003bad235eee57562b95b76d, 2022)
+- Version: 2.2.5 (58837ef586278d18cbebee50be758835ed4be79a, 2023)
 - License: BSD-3-Clause
 
 Files extracted from upstream source:
@@ -713,7 +731,7 @@ instead of `miniz.h` as an external dependency.
 ## thorvg
 
 - Upstream: https://github.com/thorvg/thorvg
-- Version: 0.9.0 (a744006aa1edb918bacf0a415d0a57ca058e25f4, 2023)
+- Version: 0.10.0 (b8c605583fd7de73209a93a1238e1ba72cce2e8f, 2023)
 - License: MIT
 
 Files extracted from upstream source:

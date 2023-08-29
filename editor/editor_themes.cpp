@@ -176,12 +176,6 @@ void EditorColorMap::create() {
 	add_conversion_exception("Sky");
 	add_conversion_exception("EditorControlAnchor");
 	add_conversion_exception("DefaultProjectIcon");
-	add_conversion_exception("GuiChecked");
-	add_conversion_exception("GuiRadioChecked");
-	add_conversion_exception("GuiIndeterminate");
-	add_conversion_exception("GuiCloseCustomizable");
-	add_conversion_exception("GuiGraphNodePort");
-	add_conversion_exception("GuiResizer");
 	add_conversion_exception("ZoomMore");
 	add_conversion_exception("ZoomLess");
 	add_conversion_exception("ZoomReset");
@@ -191,6 +185,18 @@ void EditorColorMap::create() {
 	add_conversion_exception("StatusSuccess");
 	add_conversion_exception("StatusWarning");
 	add_conversion_exception("OverbrightIndicator");
+	add_conversion_exception("MaterialPreviewCube");
+	add_conversion_exception("MaterialPreviewSphere");
+	add_conversion_exception("MaterialPreviewLight1");
+	add_conversion_exception("MaterialPreviewLight2");
+
+	// GUI
+	add_conversion_exception("GuiChecked");
+	add_conversion_exception("GuiRadioChecked");
+	add_conversion_exception("GuiIndeterminate");
+	add_conversion_exception("GuiCloseCustomizable");
+	add_conversion_exception("GuiGraphNodePort");
+	add_conversion_exception("GuiResizer");
 	add_conversion_exception("GuiMiniCheckerboard");
 
 	/// Code Editor.
@@ -239,7 +245,7 @@ static Ref<StyleBoxLine> make_line_stylebox(Color p_color, int p_thickness = 1, 
 	return style;
 }
 
-// See also `generate_icon()` in `scene/resources/default_theme.cpp`.
+// See also `generate_icon()` in `scene/theme/default_theme.cpp`.
 static Ref<ImageTexture> editor_generate_icon(int p_index, float p_scale, float p_saturation, const HashMap<Color, Color> &p_convert_colors = HashMap<Color, Color>()) {
 	Ref<Image> img = memnew(Image);
 
@@ -468,7 +474,7 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 		preset_accent_color = Color(0.18, 0.50, 1.00);
 		preset_base_color = Color(0.9, 0.9, 0.9);
 		// A negative contrast rate looks better for light themes, since it better follows the natural order of UI "elevation".
-		preset_contrast = -0.08;
+		preset_contrast = -0.06;
 	} else if (preset == "Solarized (Dark)") {
 		preset_accent_color = Color(0.15, 0.55, 0.82);
 		preset_base_color = Color(0.04, 0.23, 0.27);
@@ -477,7 +483,7 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 		preset_accent_color = Color(0.15, 0.55, 0.82);
 		preset_base_color = Color(0.89, 0.86, 0.79);
 		// A negative contrast rate looks better for light themes, since it better follows the natural order of UI "elevation".
-		preset_contrast = -0.08;
+		preset_contrast = -0.06;
 	} else if (preset == "Black (OLED)") {
 		preset_accent_color = Color(0.45, 0.75, 1.0);
 		preset_base_color = Color(0, 0, 0);
@@ -908,7 +914,7 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	theme->set_color("icon_pressed_color", "Button", icon_pressed_color);
 	theme->set_color("icon_disabled_color", "Button", icon_disabled_color);
 
-	theme->set_constant("h_separation", "Button", 2 * EDSCALE);
+	theme->set_constant("h_separation", "Button", 4 * EDSCALE);
 	theme->set_constant("outline_size", "Button", 0);
 
 	const float ACTION_BUTTON_EXTRA_MARGIN = 32 * EDSCALE;
@@ -943,6 +949,25 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	editor_log_button_pressed->set_border_width(SIDE_BOTTOM, 2 * EDSCALE);
 	editor_log_button_pressed->set_border_color(accent_color);
 	theme->set_stylebox("pressed", "EditorLogFilterButton", editor_log_button_pressed);
+
+	// Buttons in material previews
+	const Color dim_light_color = icon_normal_color.darkened(0.24);
+	const Color dim_light_highlighted_color = icon_normal_color.darkened(0.18);
+	Ref<StyleBox> sb_empty_borderless = make_empty_stylebox();
+
+	theme->set_type_variation("PreviewLightButton", "Button");
+	// When pressed, don't use the accent color tint. When unpressed, dim the icon.
+	theme->set_color("icon_normal_color", "PreviewLightButton", dim_light_color);
+	theme->set_color("icon_focus_color", "PreviewLightButton", dim_light_color);
+	theme->set_color("icon_pressed_color", "PreviewLightButton", icon_normal_color);
+	theme->set_color("icon_hover_pressed_color", "PreviewLightButton", icon_normal_color);
+	// Unpressed icon is dim, so use a dim highlight.
+	theme->set_color("icon_hover_color", "PreviewLightButton", dim_light_highlighted_color);
+
+	theme->set_stylebox("normal", "PreviewLightButton", sb_empty_borderless);
+	theme->set_stylebox("hover", "PreviewLightButton", sb_empty_borderless);
+	theme->set_stylebox("focus", "PreviewLightButton", sb_empty_borderless);
+	theme->set_stylebox("pressed", "PreviewLightButton", sb_empty_borderless);
 
 	// ProjectTag
 	{
@@ -1255,6 +1280,7 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	}
 
 	theme->set_stylebox("panel", "Tree", style_tree_bg);
+	theme->set_stylebox("panel", "EditorValidationPanel", style_tree_bg);
 
 	// Tree
 	theme->set_icon("checked", "Tree", theme->get_icon(SNAME("GuiChecked"), SNAME("EditorIcons")));
@@ -1480,6 +1506,11 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	Ref<StyleBoxFlat> style_theme_preview_bg_tab = style_tab_unselected->duplicate();
 	style_theme_preview_bg_tab->set_expand_margin(SIDE_BOTTOM, 2 * EDSCALE);
 	theme->set_stylebox("ThemeEditorPreviewBG", "EditorStyles", style_theme_preview_bg_tab);
+
+	Ref<StyleBoxFlat> style_texture_region_bg = style_tree_bg->duplicate();
+	style_texture_region_bg->set_content_margin_all(0);
+	theme->set_stylebox("TextureRegionPreviewBG", "EditorStyles", style_texture_region_bg);
+	theme->set_stylebox("TextureRegionPreviewFG", "EditorStyles", make_empty_stylebox(0, 0, 0, 0));
 
 	// Separators
 	theme->set_stylebox("separator", "HSeparator", make_line_stylebox(separator_color, MAX(Math::round(EDSCALE), border_width)));
@@ -1793,7 +1824,7 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	theme->set_constant("outline_size", "ProgressBar", 0);
 
 	// GraphEdit
-	theme->set_stylebox("bg", "GraphEdit", style_tree_bg);
+	theme->set_stylebox("panel", "GraphEdit", style_tree_bg);
 	if (dark_theme) {
 		theme->set_color("grid_major", "GraphEdit", Color(1.0, 1.0, 1.0, 0.15));
 		theme->set_color("grid_minor", "GraphEdit", Color(1.0, 1.0, 1.0, 0.07));
@@ -1804,18 +1835,20 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	theme->set_color("selection_fill", "GraphEdit", theme->get_color(SNAME("box_selection_fill_color"), SNAME("Editor")));
 	theme->set_color("selection_stroke", "GraphEdit", theme->get_color(SNAME("box_selection_stroke_color"), SNAME("Editor")));
 	theme->set_color("activity", "GraphEdit", accent_color);
-	theme->set_icon("minus", "GraphEdit", theme->get_icon(SNAME("ZoomLess"), SNAME("EditorIcons")));
-	theme->set_icon("more", "GraphEdit", theme->get_icon(SNAME("ZoomMore"), SNAME("EditorIcons")));
-	theme->set_icon("reset", "GraphEdit", theme->get_icon(SNAME("ZoomReset"), SNAME("EditorIcons")));
-	theme->set_icon("snap", "GraphEdit", theme->get_icon(SNAME("SnapGrid"), SNAME("EditorIcons")));
-	theme->set_icon("minimap", "GraphEdit", theme->get_icon(SNAME("GridMinimap"), SNAME("EditorIcons")));
+
+	theme->set_icon("zoom_out", "GraphEdit", theme->get_icon(SNAME("ZoomLess"), SNAME("EditorIcons")));
+	theme->set_icon("zoom_in", "GraphEdit", theme->get_icon(SNAME("ZoomMore"), SNAME("EditorIcons")));
+	theme->set_icon("zoom_reset", "GraphEdit", theme->get_icon(SNAME("ZoomReset"), SNAME("EditorIcons")));
+	theme->set_icon("grid_toggle", "GraphEdit", theme->get_icon(SNAME("GridToggle"), SNAME("EditorIcons")));
+	theme->set_icon("minimap_toggle", "GraphEdit", theme->get_icon(SNAME("GridMinimap"), SNAME("EditorIcons")));
+	theme->set_icon("snapping_toggle", "GraphEdit", theme->get_icon(SNAME("SnapGrid"), SNAME("EditorIcons")));
 	theme->set_icon("layout", "GraphEdit", theme->get_icon(SNAME("GridLayout"), SNAME("EditorIcons")));
 
 	// GraphEditMinimap
 	Ref<StyleBoxFlat> style_minimap_bg = make_flat_stylebox(dark_color_1, 0, 0, 0, 0);
 	style_minimap_bg->set_border_color(dark_color_3);
 	style_minimap_bg->set_border_width_all(1);
-	theme->set_stylebox("bg", "GraphEditMinimap", style_minimap_bg);
+	theme->set_stylebox("panel", "GraphEditMinimap", style_minimap_bg);
 
 	Ref<StyleBoxFlat> style_minimap_camera;
 	Ref<StyleBoxFlat> style_minimap_node;
@@ -1895,8 +1928,6 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 
 	theme->set_stylebox("frame", "GraphNode", graphsb);
 	theme->set_stylebox("selected_frame", "GraphNode", graphsbselected);
-	theme->set_stylebox("comment", "GraphNode", graphsbcomment);
-	theme->set_stylebox("comment_focus", "GraphNode", graphsbcommentselected);
 	theme->set_stylebox("breakpoint", "GraphNode", graphsbbreakpoint);
 	theme->set_stylebox("position", "GraphNode", graphsbposition);
 	theme->set_stylebox("slot", "GraphNode", graphsbslot);
@@ -1941,7 +1972,7 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	theme->set_color("files_disabled", "FileDialog", font_disabled_color);
 
 	// ColorPicker
-	theme->set_constant("margin", "ColorPicker", popup_margin_size);
+	theme->set_constant("margin", "ColorPicker", default_margin_size);
 	theme->set_constant("sv_width", "ColorPicker", 256 * EDSCALE);
 	theme->set_constant("sv_height", "ColorPicker", 256 * EDSCALE);
 	theme->set_constant("h_width", "ColorPicker", 30 * EDSCALE);

@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  object.compat.inc                                                     */
+/*  tile_map.compat.inc                                                   */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -29,10 +29,6 @@
 /**************************************************************************/
 
 #ifndef DISABLE_DEPRECATED
-
-#include "core/object/object.h"
-
-#include "core/object/class_db.h"
 
 Rect2i TileMap::_get_used_rect_bind_compat_78328() {
 	return get_used_rect();

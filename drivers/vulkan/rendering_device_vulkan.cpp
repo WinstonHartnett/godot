@@ -2622,7 +2622,7 @@ Error RenderingDeviceVulkan::_texture_update(RID p_texture, uint32_t p_layer, co
 
 					vkCmdCopyBufferToImage(command_buffer, staging_buffer_blocks[staging_buffer_current].buffer, texture->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &buffer_image_copy);
 
-					staging_buffer_blocks.write[staging_buffer_current].fill_amount += alloc_size;
+					staging_buffer_blocks.write[staging_buffer_current].fill_amount = alloc_offset + alloc_size;
 				}
 			}
 		}
@@ -2891,6 +2891,29 @@ bool RenderingDeviceVulkan::texture_is_shared(RID p_texture) {
 
 bool RenderingDeviceVulkan::texture_is_valid(RID p_texture) {
 	return texture_owner.owns(p_texture);
+}
+
+RD::TextureFormat RenderingDeviceVulkan::texture_get_format(RID p_texture) {
+	_THREAD_SAFE_METHOD_
+
+	Texture *tex = texture_owner.get_or_null(p_texture);
+	ERR_FAIL_COND_V(!tex, TextureFormat());
+
+	TextureFormat tf;
+
+	tf.format = tex->format;
+	tf.width = tex->width;
+	tf.height = tex->height;
+	tf.depth = tex->depth;
+	tf.array_layers = tex->layers;
+	tf.mipmaps = tex->mipmaps;
+	tf.texture_type = tex->type;
+	tf.samples = tex->samples;
+	tf.usage_bits = tex->usage_flags;
+	tf.shareable_formats = tex->allowed_shared_formats;
+	tf.is_resolve_buffer = tex->is_resolve_buffer;
+
+	return tf;
 }
 
 Size2i RenderingDeviceVulkan::texture_size(RID p_texture) {
@@ -4664,7 +4687,7 @@ Vector<uint8_t> RenderingDeviceVulkan::shader_compile_binary_from_spirv(const Ve
 			"Number of uniform sets is larger than what is supported by the hardware (" + itos(limits.maxBoundDescriptorSets) + ").");
 
 	// Collect reflection data into binary data.
-	RenderingDeviceVulkanShaderBinaryData binary_data;
+	RenderingDeviceVulkanShaderBinaryData binary_data{};
 	Vector<Vector<RenderingDeviceVulkanShaderBinaryDataBinding>> uniform_info; // Set bindings.
 	Vector<RenderingDeviceVulkanShaderBinarySpecializationConstant> specialization_constants;
 	{
@@ -4789,11 +4812,14 @@ Vector<uint8_t> RenderingDeviceVulkan::shader_compile_binary_from_spirv(const Ve
 		offset += sizeof(uint32_t);
 		memcpy(binptr + offset, &binary_data, sizeof(RenderingDeviceVulkanShaderBinaryData));
 		offset += sizeof(RenderingDeviceVulkanShaderBinaryData);
-		memcpy(binptr + offset, shader_name_utf.ptr(), binary_data.shader_name_len);
-		offset += binary_data.shader_name_len;
 
-		if ((binary_data.shader_name_len % 4) != 0) { // Alignment rules are really strange.
-			offset += 4 - (binary_data.shader_name_len % 4);
+		if (binary_data.shader_name_len > 0) {
+			memcpy(binptr + offset, shader_name_utf.ptr(), binary_data.shader_name_len);
+			offset += binary_data.shader_name_len;
+
+			if ((binary_data.shader_name_len % 4) != 0) { // Alignment rules are really strange.
+				offset += 4 - (binary_data.shader_name_len % 4);
+			}
 		}
 
 		for (int i = 0; i < uniform_info.size(); i++) {
@@ -4835,7 +4861,7 @@ Vector<uint8_t> RenderingDeviceVulkan::shader_compile_binary_from_spirv(const Ve
 	return ret;
 }
 
-RID RenderingDeviceVulkan::shader_create_from_bytecode(const Vector<uint8_t> &p_shader_binary) {
+RID RenderingDeviceVulkan::shader_create_from_bytecode(const Vector<uint8_t> &p_shader_binary, RID p_placeholder) {
 	const uint8_t *binptr = p_shader_binary.ptr();
 	uint32_t binsize = p_shader_binary.size();
 
@@ -5020,17 +5046,24 @@ RID RenderingDeviceVulkan::shader_create_from_bytecode(const Vector<uint8_t> &p_
 
 	_THREAD_SAFE_METHOD_
 
-	Shader shader;
+	RID id;
+	if (p_placeholder.is_null()) {
+		id = shader_owner.make_rid();
+	} else {
+		id = p_placeholder;
+	}
 
-	shader.vertex_input_mask = vertex_input_mask;
-	shader.fragment_output_mask = fragment_output_mask;
-	shader.push_constant = push_constant;
-	shader.is_compute = is_compute;
-	shader.compute_local_size[0] = compute_local_size[0];
-	shader.compute_local_size[1] = compute_local_size[1];
-	shader.compute_local_size[2] = compute_local_size[2];
-	shader.specialization_constants = specialization_constants;
-	shader.name = name;
+	Shader *shader = shader_owner.get_or_null(id);
+
+	shader->vertex_input_mask = vertex_input_mask;
+	shader->fragment_output_mask = fragment_output_mask;
+	shader->push_constant = push_constant;
+	shader->is_compute = is_compute;
+	shader->compute_local_size[0] = compute_local_size[0];
+	shader->compute_local_size[1] = compute_local_size[1];
+	shader->compute_local_size[2] = compute_local_size[2];
+	shader->specialization_constants = specialization_constants;
+	shader->name = name;
 
 	String error_text;
 
@@ -5062,7 +5095,7 @@ RID RenderingDeviceVulkan::shader_create_from_bytecode(const Vector<uint8_t> &p_
 		shader_stage.pName = "main";
 		shader_stage.pSpecializationInfo = nullptr;
 
-		shader.pipeline_stages.push_back(shader_stage);
+		shader->pipeline_stages.push_back(shader_stage);
 	}
 	// Proceed to create descriptor sets.
 
@@ -5105,8 +5138,8 @@ RID RenderingDeviceVulkan::shader_create_from_bytecode(const Vector<uint8_t> &p_
 				}
 			}
 
-			shader.sets.push_back(set);
-			shader.set_formats.push_back(format);
+			shader->sets.push_back(set);
+			shader->set_formats.push_back(format);
 		}
 	}
 
@@ -5116,13 +5149,13 @@ RID RenderingDeviceVulkan::shader_create_from_bytecode(const Vector<uint8_t> &p_
 		pipeline_layout_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		pipeline_layout_create_info.pNext = nullptr;
 		pipeline_layout_create_info.flags = 0;
-		pipeline_layout_create_info.setLayoutCount = shader.sets.size();
+		pipeline_layout_create_info.setLayoutCount = shader->sets.size();
 
 		Vector<VkDescriptorSetLayout> layouts;
-		layouts.resize(shader.sets.size());
+		layouts.resize(shader->sets.size());
 
 		for (int i = 0; i < layouts.size(); i++) {
-			layouts.write[i] = shader.sets[i].descriptor_set_layout;
+			layouts.write[i] = shader->sets[i].descriptor_set_layout;
 		}
 
 		pipeline_layout_create_info.pSetLayouts = layouts.ptr();
@@ -5141,7 +5174,7 @@ RID RenderingDeviceVulkan::shader_create_from_bytecode(const Vector<uint8_t> &p_
 			pipeline_layout_create_info.pPushConstantRanges = nullptr;
 		}
 
-		VkResult err = vkCreatePipelineLayout(device, &pipeline_layout_create_info, nullptr, &shader.pipeline_layout);
+		VkResult err = vkCreatePipelineLayout(device, &pipeline_layout_create_info, nullptr, &shader->pipeline_layout);
 
 		if (err) {
 			error_text = "Error (" + itos(err) + ") creating pipeline layout.";
@@ -5151,22 +5184,28 @@ RID RenderingDeviceVulkan::shader_create_from_bytecode(const Vector<uint8_t> &p_
 
 	if (!success) {
 		// Clean up if failed.
-		for (int i = 0; i < shader.pipeline_stages.size(); i++) {
-			vkDestroyShaderModule(device, shader.pipeline_stages[i].module, nullptr);
+		for (int i = 0; i < shader->pipeline_stages.size(); i++) {
+			vkDestroyShaderModule(device, shader->pipeline_stages[i].module, nullptr);
 		}
 
-		for (int i = 0; i < shader.sets.size(); i++) {
-			vkDestroyDescriptorSetLayout(device, shader.sets[i].descriptor_set_layout, nullptr);
+		for (int i = 0; i < shader->sets.size(); i++) {
+			vkDestroyDescriptorSetLayout(device, shader->sets[i].descriptor_set_layout, nullptr);
 		}
+
+		shader_owner.free(id);
 
 		ERR_FAIL_V_MSG(RID(), error_text);
 	}
 
-	RID id = shader_owner.make_rid(shader);
 #ifdef DEV_ENABLED
 	set_resource_name(id, "RID:" + itos(id.get_id()));
 #endif
 	return id;
+}
+
+RID RenderingDeviceVulkan::shader_create_placeholder() {
+	Shader shader;
+	return shader_owner.make_rid(shader);
 }
 
 uint32_t RenderingDeviceVulkan::shader_get_vertex_input_attribute_mask(RID p_shader) {
@@ -5867,6 +5906,64 @@ void RenderingDeviceVulkan::uniform_set_set_invalidation_callback(RID p_uniform_
 	ERR_FAIL_COND(!us);
 	us->invalidated_callback = p_callback;
 	us->invalidated_callback_userdata = p_userdata;
+}
+
+Error RenderingDeviceVulkan::buffer_copy(RID p_src_buffer, RID p_dst_buffer, uint32_t p_src_offset, uint32_t p_dst_offset, uint32_t p_size, BitField<BarrierMask> p_post_barrier) {
+	_THREAD_SAFE_METHOD_
+
+	ERR_FAIL_COND_V_MSG(draw_list, ERR_INVALID_PARAMETER,
+			"Copying buffers is forbidden during creation of a draw list");
+	ERR_FAIL_COND_V_MSG(compute_list, ERR_INVALID_PARAMETER,
+			"Copying buffers is forbidden during creation of a compute list");
+
+	// This method assumes the barriers have been pushed prior to being called, therefore no barriers are pushed
+	// for the source or destination buffers before performing the copy. These masks are effectively ignored.
+	VkPipelineShaderStageCreateFlags src_stage_mask = 0;
+	VkAccessFlags src_access_mask = 0;
+	Buffer *src_buffer = _get_buffer_from_owner(p_src_buffer, src_stage_mask, src_access_mask, BARRIER_MASK_NO_BARRIER);
+	if (!src_buffer) {
+		ERR_FAIL_V_MSG(ERR_INVALID_PARAMETER, "Source buffer argument is not a valid buffer of any type.");
+	}
+
+	VkPipelineStageFlags dst_stage_mask = 0;
+	VkAccessFlags dst_access = 0;
+	if (p_post_barrier.has_flag(BARRIER_MASK_TRANSFER)) {
+		// If the post barrier mask defines it, we indicate the destination buffer will require a barrier with these flags set
+		// after the copy command is queued.
+		dst_stage_mask = VK_PIPELINE_STAGE_TRANSFER_BIT;
+		dst_access = VK_ACCESS_TRANSFER_WRITE_BIT;
+	}
+
+	Buffer *dst_buffer = _get_buffer_from_owner(p_dst_buffer, dst_stage_mask, dst_access, p_post_barrier);
+	if (!dst_buffer) {
+		ERR_FAIL_V_MSG(ERR_INVALID_PARAMETER, "Destination buffer argument is not a valid buffer of any type.");
+	}
+
+	// Validate the copy's dimensions for both buffers.
+	ERR_FAIL_COND_V_MSG((p_size + p_src_offset) > src_buffer->size, ERR_INVALID_PARAMETER, "Size is larger than the source buffer.");
+	ERR_FAIL_COND_V_MSG((p_size + p_dst_offset) > dst_buffer->size, ERR_INVALID_PARAMETER, "Size is larger than the destination buffer.");
+
+	// Perform the copy.
+	VkBufferCopy region;
+	region.srcOffset = p_src_offset;
+	region.dstOffset = p_dst_offset;
+	region.size = p_size;
+	vkCmdCopyBuffer(frames[frame].draw_command_buffer, src_buffer->buffer, dst_buffer->buffer, 1, &region);
+
+#ifdef FORCE_FULL_BARRIER
+	_full_barrier(true);
+#else
+	if (dst_stage_mask == 0) {
+		dst_stage_mask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	}
+
+	// As indicated by the post barrier mask, push a new barrier.
+	if (p_post_barrier != RD::BARRIER_MASK_NO_BARRIER) {
+		_buffer_memory_barrier(dst_buffer->buffer, p_dst_offset, p_size, VK_PIPELINE_STAGE_TRANSFER_BIT, dst_stage_mask, VK_ACCESS_TRANSFER_WRITE_BIT, dst_access, true);
+	}
+#endif
+
+	return OK;
 }
 
 Error RenderingDeviceVulkan::buffer_update(RID p_buffer, uint32_t p_offset, uint32_t p_size, const void *p_data, BitField<BarrierMask> p_post_barrier) {
@@ -7766,6 +7863,8 @@ void RenderingDeviceVulkan::draw_list_end(BitField<BarrierMask> p_post_barrier) 
 /***********************/
 
 RenderingDevice::ComputeListID RenderingDeviceVulkan::compute_list_begin(bool p_allow_draw_overlap) {
+	_THREAD_SAFE_METHOD_
+
 	ERR_FAIL_COND_V_MSG(!p_allow_draw_overlap && draw_list != nullptr, INVALID_ID, "Only one draw list can be active at the same time.");
 	ERR_FAIL_COND_V_MSG(compute_list != nullptr, INVALID_ID, "Only one draw/compute list can be active at the same time.");
 

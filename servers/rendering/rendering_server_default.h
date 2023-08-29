@@ -97,6 +97,8 @@ class RenderingServerDefault : public RenderingServer {
 
 	void _free(RID p_rid);
 
+	void _call_on_render_thread(const Callable &p_callable);
+
 public:
 	//if editor is redrawing when it shouldn't, enable this and put a breakpoint in _changes_changed()
 	//#define DEBUG_CHANGES
@@ -210,9 +212,13 @@ public:
 
 	FUNC2(texture_set_path, RID, const String &)
 	FUNC1RC(String, texture_get_path, RID)
+
+	FUNC1RC(Image::Format, texture_get_format, RID)
+
 	FUNC1(texture_debug_usage, List<TextureInfo> *)
 
 	FUNC2(texture_set_force_redraw_if_visible, RID, bool)
+	FUNCRIDTEX2(texture_rd, const RID &, const RS::TextureLayeredType)
 	FUNC2RC(RID, texture_get_rd_texture, RID, bool)
 	FUNC2RC(uint64_t, texture_get_native_handle, RID, bool)
 
@@ -623,6 +629,7 @@ public:
 	FUNC2(viewport_remove_canvas, RID, RID)
 	FUNC3(viewport_set_canvas_transform, RID, RID, const Transform2D &)
 	FUNC2(viewport_set_transparent_background, RID, bool)
+	FUNC2(viewport_set_use_hdr_2d, RID, bool)
 	FUNC2(viewport_set_snap_2d_transforms_to_pixel, RID, bool)
 	FUNC2(viewport_set_snap_2d_vertices_to_pixel, RID, bool)
 
@@ -986,6 +993,15 @@ public:
 	virtual bool has_changed() const override;
 	virtual void init() override;
 	virtual void finish() override;
+
+	virtual void call_on_render_thread(const Callable &p_callable) override {
+		if (Thread::get_caller_id() == server_thread) {
+			command_queue.flush_if_pending();
+			_call_on_render_thread(p_callable);
+		} else {
+			command_queue.push(this, &RenderingServerDefault::_call_on_render_thread, p_callable);
+		}
+	}
 
 	/* TESTING */
 

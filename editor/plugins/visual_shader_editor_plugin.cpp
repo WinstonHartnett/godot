@@ -428,7 +428,8 @@ void VisualShaderGraphPlugin::add_node(VisualShader::Type p_type, int p_id, bool
 	Ref<VisualShaderNodeGroupBase> group_node = Object::cast_to<VisualShaderNodeGroupBase>(vsnode.ptr());
 	bool is_group = !group_node.is_null();
 
-	bool is_comment = false;
+	Ref<VisualShaderNodeComment> comment_node = Object::cast_to<VisualShaderNodeComment>(vsnode.ptr());
+	bool is_comment = comment_node.is_valid();
 
 	Ref<VisualShaderNodeExpression> expression_node = Object::cast_to<VisualShaderNodeExpression>(group_node.ptr());
 	bool is_expression = !expression_node.is_null();
@@ -467,6 +468,10 @@ void VisualShaderGraphPlugin::add_node(VisualShader::Type p_type, int p_id, bool
 		expression = expression_node->get_expression();
 	}
 
+	if (is_comment) {
+		node->set_visible(false);
+	}
+
 	node->set_position_offset(visual_shader->get_node_position(p_type, p_id));
 	node->set_title(vsnode->get_caption());
 	node->set_name(itos(p_id));
@@ -490,17 +495,6 @@ void VisualShaderGraphPlugin::add_node(VisualShader::Type p_type, int p_id, bool
 	}
 
 	if (is_resizable) {
-		Ref<VisualShaderNodeComment> comment_node = Object::cast_to<VisualShaderNodeComment>(vsnode.ptr());
-		if (comment_node.is_valid()) {
-			is_comment = true;
-			node->set_comment(true);
-
-			Label *comment_label = memnew(Label);
-			node->add_child(comment_label);
-			comment_label->set_h_size_flags(Control::SIZE_EXPAND_FILL);
-			comment_label->set_v_size_flags(Control::SIZE_EXPAND_FILL);
-			comment_label->set_text(comment_node->get_description());
-		}
 		editor->call_deferred(SNAME("_set_node_size"), (int)p_type, p_id, size);
 	}
 
@@ -1160,7 +1154,7 @@ void VisualShaderEditor::edit(VisualShader *p_visual_shader) {
 		graph_plugin->register_shader(visual_shader.ptr());
 
 		visual_shader->connect_changed(callable_mp(this, &VisualShaderEditor::_update_preview));
-		visual_shader->set_graph_offset(graph->get_scroll_ofs() / EDSCALE);
+		visual_shader->set_graph_offset(graph->get_scroll_offset() / EDSCALE);
 		_set_mode(visual_shader->get_mode());
 
 		_update_nodes();
@@ -2025,7 +2019,7 @@ void VisualShaderEditor::_update_graph() {
 		return;
 	}
 
-	graph->set_scroll_ofs(visual_shader->get_graph_offset() * EDSCALE);
+	graph->set_scroll_offset(visual_shader->get_graph_offset() * EDSCALE);
 
 	VisualShader::Type type = get_current_shader_type();
 
@@ -3096,7 +3090,7 @@ void VisualShaderEditor::_add_node(int p_idx, const Vector<Variant> &p_ops, Stri
 	bool is_curve_xyz = (Object::cast_to<VisualShaderNodeCurveXYZTexture>(vsnode.ptr()) != nullptr);
 	bool is_parameter = (Object::cast_to<VisualShaderNodeParameter>(vsnode.ptr()) != nullptr);
 
-	Point2 position = graph->get_scroll_ofs();
+	Point2 position = graph->get_scroll_offset();
 
 	if (saved_node_pos_dirty) {
 		position += saved_node_pos;
@@ -4002,7 +3996,7 @@ void VisualShaderEditor::_show_members_dialog(bool at_mouse_pos, VisualShaderNod
 	members_dialog->popup();
 
 	// Keep dialog within window bounds.
-	Rect2 window_rect = Rect2(DisplayServer::get_singleton()->window_get_position(), DisplayServer::get_singleton()->window_get_size());
+	Rect2 window_rect = Rect2(get_window()->get_position(), get_window()->get_size());
 	Rect2 dialog_rect = Rect2(members_dialog->get_position(), members_dialog->get_size());
 	Vector2 difference = (dialog_rect.get_end() - window_rect.get_end()).max(Vector2());
 	members_dialog->set_position(members_dialog->get_position() - difference);
@@ -4393,7 +4387,7 @@ void VisualShaderEditor::_paste_nodes(bool p_use_custom_position, const Vector2 
 		mpos = graph->get_local_mouse_position();
 	}
 
-	_dup_paste_nodes(type, copy_items_buffer, copy_connections_buffer, graph->get_scroll_ofs() / scale + mpos / scale - selection_center, false);
+	_dup_paste_nodes(type, copy_items_buffer, copy_connections_buffer, graph->get_scroll_offset() / scale + mpos / scale - selection_center, false);
 }
 
 void VisualShaderEditor::_mode_selected(int p_id) {
@@ -5096,7 +5090,7 @@ VisualShaderEditor::VisualShaderEditor() {
 	FileSystemDock::get_singleton()->connect("resource_removed", callable_mp(this, &VisualShaderEditor::_resource_removed));
 
 	graph = memnew(GraphEdit);
-	graph->get_zoom_hbox()->set_h_size_flags(SIZE_EXPAND_FILL);
+	graph->get_menu_hbox()->set_h_size_flags(SIZE_EXPAND_FILL);
 	graph->set_v_size_flags(SIZE_EXPAND_FILL);
 	graph->set_h_size_flags(SIZE_EXPAND_FILL);
 	graph->set_show_zoom_label(true);
@@ -5189,8 +5183,8 @@ VisualShaderEditor::VisualShaderEditor() {
 	graph->add_valid_connection_type(VisualShaderNode::PORT_TYPE_SAMPLER, VisualShaderNode::PORT_TYPE_SAMPLER);
 
 	VSeparator *vs = memnew(VSeparator);
-	graph->get_zoom_hbox()->add_child(vs);
-	graph->get_zoom_hbox()->move_child(vs, 0);
+	graph->get_menu_hbox()->add_child(vs);
+	graph->get_menu_hbox()->move_child(vs, 0);
 
 	custom_mode_box = memnew(CheckBox);
 	custom_mode_box->set_text(TTR("Custom"));
@@ -5224,28 +5218,28 @@ VisualShaderEditor::VisualShaderEditor() {
 
 	edit_type = edit_type_standard;
 
-	graph->get_zoom_hbox()->add_child(custom_mode_box);
-	graph->get_zoom_hbox()->move_child(custom_mode_box, 0);
-	graph->get_zoom_hbox()->add_child(edit_type_standard);
-	graph->get_zoom_hbox()->move_child(edit_type_standard, 0);
-	graph->get_zoom_hbox()->add_child(edit_type_particles);
-	graph->get_zoom_hbox()->move_child(edit_type_particles, 0);
-	graph->get_zoom_hbox()->add_child(edit_type_sky);
-	graph->get_zoom_hbox()->move_child(edit_type_sky, 0);
-	graph->get_zoom_hbox()->add_child(edit_type_fog);
-	graph->get_zoom_hbox()->move_child(edit_type_fog, 0);
+	graph->get_menu_hbox()->add_child(custom_mode_box);
+	graph->get_menu_hbox()->move_child(custom_mode_box, 0);
+	graph->get_menu_hbox()->add_child(edit_type_standard);
+	graph->get_menu_hbox()->move_child(edit_type_standard, 0);
+	graph->get_menu_hbox()->add_child(edit_type_particles);
+	graph->get_menu_hbox()->move_child(edit_type_particles, 0);
+	graph->get_menu_hbox()->add_child(edit_type_sky);
+	graph->get_menu_hbox()->move_child(edit_type_sky, 0);
+	graph->get_menu_hbox()->add_child(edit_type_fog);
+	graph->get_menu_hbox()->move_child(edit_type_fog, 0);
 
 	add_node = memnew(Button);
 	add_node->set_flat(true);
 	add_node->set_text(TTR("Add Node..."));
-	graph->get_zoom_hbox()->add_child(add_node);
-	graph->get_zoom_hbox()->move_child(add_node, 0);
+	graph->get_menu_hbox()->add_child(add_node);
+	graph->get_menu_hbox()->move_child(add_node, 0);
 	add_node->connect("pressed", callable_mp(this, &VisualShaderEditor::_show_members_dialog).bind(false, VisualShaderNode::PORT_TYPE_MAX, VisualShaderNode::PORT_TYPE_MAX));
 
 	varying_button = memnew(MenuButton);
 	varying_button->set_text(TTR("Manage Varyings"));
 	varying_button->set_switch_on_hover(true);
-	graph->get_zoom_hbox()->add_child(varying_button);
+	graph->get_menu_hbox()->add_child(varying_button);
 
 	PopupMenu *varying_menu = varying_button->get_popup();
 	varying_menu->add_item(TTR("Add Varying"), int(VaryingMenuOptions::ADD));
@@ -5256,7 +5250,7 @@ VisualShaderEditor::VisualShaderEditor() {
 	preview_shader->set_flat(true);
 	preview_shader->set_toggle_mode(true);
 	preview_shader->set_tooltip_text(TTR("Show generated shader code."));
-	graph->get_zoom_hbox()->add_child(preview_shader);
+	graph->get_menu_hbox()->add_child(preview_shader);
 	preview_shader->connect("pressed", callable_mp(this, &VisualShaderEditor::_show_preview_text));
 
 	///////////////////////////////////////
@@ -5881,6 +5875,10 @@ VisualShaderEditor::VisualShaderEditor() {
 	add_options.push_back(AddOption("CurveXYZTexture", "Textures/Functions", "VisualShaderNodeCurveXYZTexture", TTR("Perform the three components curve texture lookup."), {}, VisualShaderNode::PORT_TYPE_VECTOR_3D));
 	add_options.push_back(AddOption("LinearSceneDepth", "Textures/Functions", "VisualShaderNodeLinearSceneDepth", TTR("Returns the depth value obtained from the depth prepass in a linear space."), {}, VisualShaderNode::PORT_TYPE_SCALAR, TYPE_FLAGS_FRAGMENT, Shader::MODE_SPATIAL));
 	texture2d_node_option_idx = add_options.size();
+	add_options.push_back(AddOption("WorldPositionFromDepth", "Textures/Functions", "VisualShaderNodeWorldPositionFromDepth", TTR("Reconstructs the World Position of the Node from the depth texture."), {}, VisualShaderNode::PORT_TYPE_VECTOR_3D, TYPE_FLAGS_FRAGMENT, Shader::MODE_SPATIAL));
+	texture2d_node_option_idx = add_options.size();
+	add_options.push_back(AddOption("ScreenNormalWorldSpace", "Textures/Functions", "VisualShaderNodeScreenNormalWorldSpace", TTR("Unpacks the Screen Normal Texture in World Space"), {}, VisualShaderNode::PORT_TYPE_VECTOR_3D, TYPE_FLAGS_FRAGMENT, Shader::MODE_SPATIAL));
+	texture2d_node_option_idx = add_options.size();
 	add_options.push_back(AddOption("Texture2D", "Textures/Functions", "VisualShaderNodeTexture", TTR("Perform the 2D texture lookup."), {}, VisualShaderNode::PORT_TYPE_VECTOR_4D));
 	texture2d_array_node_option_idx = add_options.size();
 	add_options.push_back(AddOption("Texture2DArray", "Textures/Functions", "VisualShaderNodeTexture2DArray", TTR("Perform the 2D-array texture lookup."), {}, VisualShaderNode::PORT_TYPE_VECTOR_4D));
@@ -5925,6 +5923,8 @@ VisualShaderEditor::VisualShaderEditor() {
 	add_options.push_back(AddOption("ProximityFade", "Utility", "VisualShaderNodeProximityFade", TTR("The proximity fade effect fades out each pixel based on its distance to another object."), {}, VisualShaderNode::PORT_TYPE_SCALAR, TYPE_FLAGS_FRAGMENT, Shader::MODE_SPATIAL));
 	add_options.push_back(AddOption("RandomRange", "Utility", "VisualShaderNodeRandomRange", TTR("Returns a random value between the minimum and maximum input values."), {}, VisualShaderNode::PORT_TYPE_SCALAR));
 	add_options.push_back(AddOption("Remap", "Utility", "VisualShaderNodeRemap", TTR("Remaps a given input from the input range to the output range."), {}, VisualShaderNode::PORT_TYPE_SCALAR));
+	add_options.push_back(AddOption("RotationByAxis", "Utility", "VisualShaderNodeRotationByAxis", TTR("Rotates an input vector by a given angle."), {}, VisualShaderNode::PORT_TYPE_VECTOR_3D, TYPE_FLAGS_FRAGMENT, Shader::MODE_SPATIAL));
+	add_options.push_back(AddOption("RotationByAxis", "Utility", "VisualShaderNodeRotationByAxis", TTR("Rotates an input vector by a given angle."), {}, VisualShaderNode::PORT_TYPE_VECTOR_3D, TYPE_FLAGS_VERTEX, Shader::MODE_SPATIAL));
 
 	// VECTOR
 
@@ -6127,7 +6127,6 @@ VisualShaderEditor::VisualShaderEditor() {
 
 	// SPECIAL
 
-	add_options.push_back(AddOption("Comment", "Special", "VisualShaderNodeComment", TTR("A rectangular area with a description string for better graph organization.")));
 	add_options.push_back(AddOption("Expression", "Special", "VisualShaderNodeExpression", TTR("Custom Godot Shader Language expression, with custom amount of input and output ports. This is a direct injection of code into the vertex/fragment/light function, do not use it to write the function declarations inside.")));
 	add_options.push_back(AddOption("GlobalExpression", "Special", "VisualShaderNodeGlobalExpression", TTR("Custom Godot Shader Language expression, which is placed on top of the resulted shader. You can place various function definitions inside and call it later in the Expressions. You can also declare varyings, parameters and constants.")));
 	add_options.push_back(AddOption("ParameterRef", "Special", "VisualShaderNodeParameterRef", TTR("A reference to an existing parameter.")));
@@ -6545,7 +6544,7 @@ void EditorPropertyVisualShaderMode::_option_selected(int p_which) {
 		return;
 	}
 
-	ShaderEditorPlugin *shader_editor = Object::cast_to<ShaderEditorPlugin>(EditorNode::get_singleton()->get_editor_data().get_editor("Shader"));
+	ShaderEditorPlugin *shader_editor = Object::cast_to<ShaderEditorPlugin>(EditorNode::get_editor_data().get_editor_by_name("Shader"));
 	if (!shader_editor) {
 		return;
 	}

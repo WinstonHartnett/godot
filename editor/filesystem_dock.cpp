@@ -45,6 +45,7 @@
 #include "editor/editor_scale.h"
 #include "editor/editor_settings.h"
 #include "editor/gui/editor_dir_dialog.h"
+#include "editor/gui/editor_scene_tabs.h"
 #include "editor/import/resource_importer_scene.h"
 #include "editor/import_dock.h"
 #include "editor/plugins/editor_resource_tooltip_plugins.h"
@@ -1361,7 +1362,7 @@ void FileSystemDock::_try_move_item(const FileOrFolder &p_item, const String &p_
 		for (int i = 0; i < file_changed_paths.size(); ++i) {
 			String new_item_path = p_item.is_file ? new_path : file_changed_paths[i].replace_first(old_path, new_path);
 			if (ResourceLoader::get_resource_type(new_item_path) == "PackedScene" && EditorNode::get_singleton()->is_scene_open(file_changed_paths[i])) {
-				EditorData *ed = &EditorNode::get_singleton()->get_editor_data();
+				EditorData *ed = &EditorNode::get_editor_data();
 				for (int j = 0; j < ed->get_edited_scene_count(); j++) {
 					if (ed->get_scene_path(j) == file_changed_paths[i]) {
 						ed->get_edited_scene_root(j)->set_scene_file_path(new_item_path);
@@ -1629,7 +1630,7 @@ void FileSystemDock::_make_scene_confirm() {
 	const String scene_path = make_scene_dialog->get_scene_path();
 
 	int idx = EditorNode::get_singleton()->new_scene();
-	EditorNode::get_singleton()->get_editor_data().set_scene_path(idx, scene_path);
+	EditorNode::get_editor_data().set_scene_path(idx, scene_path);
 	EditorNode::get_singleton()->set_edited_scene(make_scene_dialog->create_scene_root());
 	EditorNode::get_singleton()->save_scene_list({ scene_path });
 }
@@ -1732,14 +1733,14 @@ void FileSystemDock::_rename_operation_confirm() {
 	HashMap<String, String> folder_renames;
 	_try_move_item(to_rename, new_path, file_renames, folder_renames);
 
-	int current_tab = EditorNode::get_singleton()->get_current_tab();
+	int current_tab = EditorSceneTabs::get_singleton()->get_current_tab();
 	_save_scenes_after_move(file_renames); // save scenes before updating
 	_update_dependencies_after_move(file_renames);
 	_update_resource_paths_after_move(file_renames);
 	_update_project_settings_after_move(file_renames);
 	_update_favorites_list_after_move(file_renames, folder_renames);
 
-	EditorNode::get_singleton()->set_current_tab(current_tab);
+	EditorSceneTabs::get_singleton()->set_current_tab(current_tab);
 
 	print_verbose("FileSystem: calling rescan.");
 	_rescan();
@@ -1881,14 +1882,14 @@ void FileSystemDock::_move_operation_confirm(const String &p_to_path, bool p_cop
 		}
 
 		if (is_moved) {
-			int current_tab = EditorNode::get_singleton()->get_current_tab();
+			int current_tab = EditorSceneTabs::get_singleton()->get_current_tab();
 			_save_scenes_after_move(file_renames); // Save scenes before updating.
 			_update_dependencies_after_move(file_renames);
 			_update_resource_paths_after_move(file_renames);
 			_update_project_settings_after_move(file_renames);
 			_update_favorites_list_after_move(file_renames, folder_renames);
 
-			EditorNode::get_singleton()->set_current_tab(current_tab);
+			EditorSceneTabs::get_singleton()->set_current_tab(current_tab);
 
 			print_verbose("FileSystem: calling rescan.");
 			_rescan();
@@ -2200,13 +2201,7 @@ void FileSystemDock::_file_option(int p_option, const Vector<String> &p_selected
 		} break;
 
 		case FILE_REIMPORT: {
-			// Reimport all selected files.
-			Vector<String> reimport;
-			for (int i = 0; i < p_selected.size(); i++) {
-				reimport.push_back(p_selected[i]);
-			}
-
-			ERR_FAIL_COND_MSG(reimport.size() == 0, "You need to select files to reimport them.");
+			ImportDock::get_singleton()->reimport_resources(p_selected);
 		} break;
 
 		case FILE_NEW_FOLDER: {
@@ -2829,6 +2824,37 @@ void FileSystemDock::_file_and_folders_fill_popup(PopupMenu *p_popup, Vector<Str
 		}
 		if (!all_not_favorites) {
 			p_popup->add_icon_item(get_theme_icon(SNAME("NonFavorite"), SNAME("EditorIcons")), TTR("Remove from Favorites"), FILE_REMOVE_FAVORITE);
+		}
+
+		{
+			List<String> resource_extensions;
+			ResourceFormatImporter::get_singleton()->get_recognized_extensions_for_type("Resource", &resource_extensions);
+			HashSet<String> extension_list;
+			for (const String &extension : resource_extensions) {
+				extension_list.insert(extension);
+			}
+
+			bool resource_valid = true;
+			String main_extension;
+
+			for (int i = 0; i != p_paths.size(); ++i) {
+				String extension = p_paths[i].get_extension();
+				if (extension_list.has(extension)) {
+					if (main_extension.is_empty()) {
+						main_extension = extension;
+					} else if (extension != main_extension) {
+						resource_valid = false;
+						break;
+					}
+				} else {
+					resource_valid = false;
+					break;
+				}
+			}
+
+			if (resource_valid) {
+				p_popup->add_icon_item(get_theme_icon(SNAME("Load"), SNAME("EditorIcons")), TTR("Reimport"), FILE_REIMPORT);
+			}
 		}
 	}
 

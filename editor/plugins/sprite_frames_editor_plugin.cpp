@@ -1212,29 +1212,28 @@ void SpriteFramesEditor::_update_library(bool p_skip_selector) {
 		bool searching = anim_search_box->get_text().size();
 		String searched_string = searching ? anim_search_box->get_text().to_lower() : String();
 
+		TreeItem *selected = nullptr;
 		for (const StringName &E : anim_names) {
 			String name = E;
-
 			if (searching && name.to_lower().find(searched_string) < 0) {
 				continue;
 			}
-
 			TreeItem *it = animations->create_item(anim_root);
-
 			it->set_metadata(0, name);
-
 			it->set_text(0, name);
 			it->set_editable(0, true);
-
 			if (animated_sprite) {
 				if (name == String(animated_sprite->call("get_autoplay"))) {
 					it->set_icon(0, autoplay_icon);
 				}
 			}
-
 			if (E == edited_anim) {
 				it->select(0);
+				selected = it;
 			}
+		}
+		if (selected) {
+			animations->scroll_to_item(selected);
 		}
 	}
 
@@ -1283,7 +1282,7 @@ void SpriteFramesEditor::_update_library(bool p_skip_selector) {
 			// Frame is often saved as an AtlasTexture subresource within a scene/resource file,
 			// thus its path might be not what the user is looking for. So we're also showing
 			// subsequent source texture paths.
-			String prefix = String::utf8("┖╴");
+			String prefix = U"┖╴";
 			Ref<AtlasTexture> at = texture;
 			while (at.is_valid() && at->get_atlas().is_valid()) {
 				tooltip += "\n" + prefix + at->get_atlas()->get_path();

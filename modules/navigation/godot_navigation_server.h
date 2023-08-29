@@ -56,6 +56,7 @@
 	void MERGE(_cmd_, F_NAME)(T_0 D_0, T_1 D_1)
 
 class GodotNavigationServer;
+class NavMeshGenerator3D;
 
 struct SetCommand {
 	virtual ~SetCommand() {}
@@ -78,6 +79,8 @@ class GodotNavigationServer : public NavigationServer3D {
 	bool active = true;
 	LocalVector<NavMap *> active_maps;
 	LocalVector<uint32_t> active_maps_update_id;
+
+	NavMeshGenerator3D *navmesh_generator_3d = nullptr;
 
 	// Performance Monitor
 	int pm_region_count = 0;
@@ -135,6 +138,9 @@ public:
 
 	virtual RID region_create() override;
 
+	COMMAND_2(region_set_enabled, RID, p_region, bool, p_enabled);
+	virtual bool region_get_enabled(RID p_region) const override;
+
 	COMMAND_2(region_set_use_edge_connections, RID, p_region, bool, p_enabled);
 	virtual bool region_get_use_edge_connections(RID p_region) const override;
 
@@ -164,6 +170,8 @@ public:
 	virtual RID link_create() override;
 	COMMAND_2(link_set_map, RID, p_link, RID, p_map);
 	virtual RID link_get_map(RID p_link) const override;
+	COMMAND_2(link_set_enabled, RID, p_link, bool, p_enabled);
+	virtual bool link_get_enabled(RID p_link) const override;
 	COMMAND_2(link_set_bidirectional, RID, p_link, bool, p_bidirectional);
 	virtual bool link_is_bidirectional(RID p_link) const override;
 	COMMAND_2(link_set_navigation_layers, RID, p_link, uint32_t, p_navigation_layers);
@@ -220,8 +228,9 @@ public:
 	virtual void obstacle_set_vertices(RID p_obstacle, const Vector<Vector3> &p_vertices) override;
 	COMMAND_2(obstacle_set_avoidance_layers, RID, p_obstacle, uint32_t, p_layers);
 
-	virtual void parse_source_geometry_data(const Ref<NavigationMesh> &p_navigation_mesh, Ref<NavigationMeshSourceGeometryData3D> p_source_geometry_data, Node *p_root_node, const Callable &p_callback = Callable()) override;
-	virtual void bake_from_source_geometry_data(Ref<NavigationMesh> p_navigation_mesh, const Ref<NavigationMeshSourceGeometryData3D> &p_source_geometry_data, const Callable &p_callback = Callable()) override;
+	virtual void parse_source_geometry_data(const Ref<NavigationMesh> &p_navigation_mesh, const Ref<NavigationMeshSourceGeometryData3D> &p_source_geometry_data, Node *p_root_node, const Callable &p_callback = Callable()) override;
+	virtual void bake_from_source_geometry_data(const Ref<NavigationMesh> &p_navigation_mesh, const Ref<NavigationMeshSourceGeometryData3D> &p_source_geometry_data, const Callable &p_callback = Callable()) override;
+	virtual void bake_from_source_geometry_data_async(const Ref<NavigationMesh> &p_navigation_mesh, const Ref<NavigationMeshSourceGeometryData3D> &p_source_geometry_data, const Callable &p_callback = Callable()) override;
 
 	COMMAND_1(free, RID, p_object);
 
@@ -229,6 +238,8 @@ public:
 
 	void flush_queries();
 	virtual void process(real_t p_delta_time) override;
+	virtual void init() override;
+	virtual void finish() override;
 
 	virtual NavigationUtilities::PathQueryResult _query_path(const NavigationUtilities::PathQueryParameters &p_parameters) const override;
 

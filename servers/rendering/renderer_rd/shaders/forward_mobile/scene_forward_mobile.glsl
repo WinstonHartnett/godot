@@ -817,11 +817,15 @@ void main() {
 	alpha = compute_alpha_antialiasing_edge(alpha, alpha_texture_coordinate, alpha_antialiasing_edge);
 #endif // ALPHA_ANTIALIASING_EDGE_USED
 
+#ifdef MODE_RENDER_DEPTH
 #ifdef USE_OPAQUE_PREPASS
+#ifndef ALPHA_SCISSOR_USED
 	if (alpha < scene_data.opaque_prepass_threshold) {
 		discard;
 	}
+#endif // !ALPHA_SCISSOR_USED
 #endif // USE_OPAQUE_PREPASS
+#endif // MODE_RENDER_DEPTH
 
 #endif // !USE_SHADOW_TO_OPACITY
 
@@ -893,6 +897,10 @@ void main() {
 
 			if (decal_index == 0xFF) {
 				break;
+			}
+
+			if (!bool(decals.data[decal_index].mask & draw_call.layer_mask)) {
+				continue; //not masked
 			}
 
 			vec3 uv_local = (decals.data[decal_index].xform * vec4(vertex, 1.0)).xyz;
@@ -1685,8 +1693,8 @@ void main() {
 	if (alpha < alpha_scissor) {
 		discard;
 	}
-#endif // ALPHA_SCISSOR_USED
-
+#else
+#ifdef MODE_RENDER_DEPTH
 #ifdef USE_OPAQUE_PREPASS
 
 	if (alpha < scene_data.opaque_prepass_threshold) {
@@ -1694,6 +1702,8 @@ void main() {
 	}
 
 #endif // USE_OPAQUE_PREPASS
+#endif // MODE_RENDER_DEPTH
+#endif // !ALPHA_SCISSOR_USED
 
 #endif // USE_SHADOW_TO_OPACITY
 

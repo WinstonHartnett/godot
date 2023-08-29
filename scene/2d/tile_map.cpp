@@ -617,6 +617,8 @@ void TileMapLayer::_navigation_update() {
 			uses_world_navigation_map = true;
 		} else {
 			RID new_layer_map = NavigationServer2D::get_singleton()->map_create();
+			// Set the default NavigationPolygon cell_size on the new map as a mismatch causes an error.
+			NavigationServer2D::get_singleton()->map_set_cell_size(new_layer_map, 1.0);
 			NavigationServer2D::get_singleton()->map_set_active(new_layer_map, true);
 			navigation_map = new_layer_map;
 			uses_world_navigation_map = false;
@@ -771,18 +773,7 @@ void TileMapLayer::_scenes_update_dirty_quadrants(SelfList<TileMapQuadrant>::Lis
 	SelfList<TileMapQuadrant> *q_list_element = r_dirty_quadrant_list.first();
 	while (q_list_element) {
 		TileMapQuadrant &q = *q_list_element->self();
-
-		// Clear the scenes if instance cache was cleared.
-		if (instantiated_scenes.is_empty()) {
-			for (const KeyValue<Vector2i, String> &E : q.scenes) {
-				Node *node = tile_map_node->get_node_or_null(E.value);
-				if (node) {
-					node->queue_free();
-				}
-			}
-		}
-
-		q.scenes.clear();
+		_scenes_cleanup_quadrant(&q);
 
 		// Recreate the scenes.
 		for (const Vector2i &E_cell : q.cells) {
@@ -1560,6 +1551,7 @@ void TileMapLayer::clear_instantiated_scenes() {
 
 void TileMapLayer::clear_internals() {
 	// Clear quadrants.
+	clear_instantiated_scenes();
 	while (quadrant_map.size()) {
 		_erase_quadrant(quadrant_map.begin());
 	}
@@ -1847,6 +1839,17 @@ void TileMapLayer::set_cell(const Vector2i &p_coords, int p_source_id, const Vec
 		ERR_FAIL_COND(!Q);
 		TileMapQuadrant &q = Q->value;
 
+		// Find node in scenes and remove it.
+		HashMap<Vector2i, String>::Iterator entry = q.scenes.find(pk);
+		if (entry != q.scenes.end()) {
+			String scene_name = entry->value;
+			Node *scene = tile_map_node->get_node_or_null(scene_name);
+			if (scene) {
+				scene->queue_free();
+				instantiated_scenes.erase(Vector2i(pk.x, pk.y));
+			}
+		}
+
 		q.cells.erase(pk);
 
 		// Remove or make the quadrant dirty.
@@ -1960,6 +1963,7 @@ TileData *TileMapLayer::get_cell_tile_data(const Vector2i &p_coords, bool p_use_
 
 void TileMapLayer::clear() {
 	// Remove all tiles.
+	clear_instantiated_scenes();
 	clear_internals();
 	tile_map.clear();
 	recreate_internals();
@@ -2271,9 +2275,12 @@ void TileMapLayer::force_update() {
 }
 
 void TileMapLayer::fix_invalid_tiles() {
+	Ref<TileSet> tileset = tile_map_node->get_tileset();
+	ERR_FAIL_COND_MSG(tileset.is_null(), "Cannot call fix_invalid_tiles() on a TileMap without a valid TileSet.");
+
 	RBSet<Vector2i> coords;
 	for (const KeyValue<Vector2i, TileMapCell> &E : tile_map) {
-		TileSetSource *source = *(tile_map_node->get_tileset())->get_source(E.value.source_id);
+		TileSetSource *source = *tileset->get_source(E.value.source_id);
 		if (!source || !source->has_tile(E.value.get_atlas_coords()) || !source->has_alternative_tile(E.value.get_atlas_coords(), E.value.alternative_tile)) {
 			coords.insert(E.key);
 		}
@@ -3280,7 +3287,7 @@ Vector2i TileMap::get_coords_for_body_rid(RID p_physics_body) {
 			return layer->get_coords_for_body_rid(p_physics_body);
 		}
 	}
-	ERR_FAIL_V_MSG(Vector2i(), vformat("No tiles for the given body RID %d.", p_physics_body));
+	ERR_FAIL_V_MSG(Vector2i(), vformat("No tiles for the given body RID %d.", p_physics_body.get_id()));
 }
 
 int TileMap::get_layer_for_body_rid(RID p_physics_body) {
@@ -3289,7 +3296,7 @@ int TileMap::get_layer_for_body_rid(RID p_physics_body) {
 			return i;
 		}
 	}
-	ERR_FAIL_V_MSG(-1, vformat("No tiles for the given body RID %d.", p_physics_body));
+	ERR_FAIL_V_MSG(-1, vformat("No tiles for the given body RID %d.", p_physics_body.get_id()));
 }
 
 void TileMap::fix_invalid_tiles() {
@@ -4087,7 +4094,7 @@ TypedArray<Vector2i> TileMap::get_used_cells(int p_layer) const {
 }
 
 TypedArray<Vector2i> TileMap::get_used_cells_by_id(int p_layer, int p_source_id, const Vector2i p_atlas_coords, int p_alternative_tile) const {
-	TILEMAP_CALL_FOR_LAYER_V(p_layer, TypedArray<Vector2i>(), get_used_cells_by_id);
+	TILEMAP_CALL_FOR_LAYER_V(p_layer, TypedArray<Vector2i>(), get_used_cells_by_id, p_source_id, p_atlas_coords, p_alternative_tile);
 }
 
 Rect2i TileMap::get_used_rect() const {

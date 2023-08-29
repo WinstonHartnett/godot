@@ -1338,7 +1338,7 @@ MaterialStorage::MaterialStorage() {
 		actions.render_mode_defines["cull_front"] = "#define DO_SIDE_CHECK\n";
 		actions.render_mode_defines["cull_disabled"] = "#define DO_SIDE_CHECK\n";
 		actions.render_mode_defines["particle_trails"] = "#define USE_PARTICLE_TRAILS\n";
-		actions.render_mode_defines["depth_draw_opaque"] = "#define USE_OPAQUE_PREPASS\n";
+		actions.render_mode_defines["depth_prepass_alpha"] = "#define USE_OPAQUE_PREPASS\n";
 
 		bool force_lambert = GLOBAL_GET("rendering/shading/overrides/force_lambert_over_burley");
 
@@ -1957,14 +1957,16 @@ void MaterialStorage::global_shader_parameters_load_settings(bool p_load_texture
 			if (gvtype >= RS::GLOBAL_VAR_TYPE_SAMPLER2D) {
 				//textire
 				if (!p_load_textures) {
-					value = RID();
 					continue;
 				}
 
 				String path = value;
-				Ref<Resource> resource = ResourceLoader::load(path);
-				ERR_CONTINUE(resource.is_null());
-				value = resource;
+				if (path.is_empty()) {
+					value = RID();
+				} else {
+					Ref<Resource> resource = ResourceLoader::load(path);
+					value = resource;
+				}
 			}
 
 			if (global_shader_uniforms.variables.has(name)) {
